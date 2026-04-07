@@ -440,7 +440,7 @@ class BreakReminderController: NSObject {
                 // Overdue - solid red circle
                 button.attributedTitle = NSAttributedString(
                     string: "●",
-                    attributes: [.foregroundColor: NSColor.systemRed, .font: NSFont.systemFont(ofSize: 14, weight: .bold)]
+                    attributes: [.foregroundColor: NSColor.systemRed, .font: NSFont.systemFont(ofSize: 16, weight: .bold), .baselineOffset: -2.0]
                 )
             } else if elapsed >= Config.amberWarning {
                 // Last 5 minutes - countdown in orange
@@ -452,7 +452,7 @@ class BreakReminderController: NSObject {
                 // Normal - black circle
                 button.attributedTitle = NSAttributedString(
                     string: "●",
-                    attributes: [.foregroundColor: NSColor.labelColor, .font: NSFont.systemFont(ofSize: 8)]
+                    attributes: [.foregroundColor: NSColor.labelColor, .font: NSFont.systemFont(ofSize: 16), .baselineOffset: -2.0]
                 )
             }
 
