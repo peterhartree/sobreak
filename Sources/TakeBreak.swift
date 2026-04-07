@@ -6,8 +6,8 @@ import IOKit.pwr_mgt
 
 struct Config {
     #if DEBUG
-    static let workDuration: TimeInterval = 60          // 1 minute for testing
-    static let amberWarning: TimeInterval = 55           // amber at 55s
+    static let workDuration: TimeInterval = 5           // 5 seconds for testing
+    static let amberWarning: TimeInterval = 3            // amber at 3s
     static let snoozeDuration: TimeInterval = 600        // 10 minutes
     static let gracePeriod: TimeInterval = 120           // 2 minutes
     static let nagAfter: TimeInterval = 300              // 5 minutes
@@ -156,7 +156,14 @@ class MediaDetector {
 // MARK: - Overlay Window
 
 class OverlayWindowController: NSObject, ObservableObject {
-    var window: NSWindow?
+    private enum Metrics {
+        static let centerSize = NSSize(width: 420, height: 420)
+        static let topSize = NSSize(width: 340, height: 130)
+        static let topShadowCompensation: CGFloat = 0
+    }
+
+    private var centerWindow: NSWindow?
+    private var topWindow: NSWindow?
 
     @Published var message: String = ""
     @Published var subtitle: String = ""
@@ -167,19 +174,50 @@ class OverlayWindowController: NSObject, ObservableObject {
     @Published var countdownText: String = ""
     @Published var showCountdown: Bool = false
     @Published var dogeImage: NSImage?
+    @Published var isCompact: Bool = false
 
     var onSnooze: (() -> Void)?
     var onTakeBreak: (() -> Void)?
     var onLockNow: (() -> Void)?
     var onFiveMore: (() -> Void)?
 
-    func show(playSound: Bool = true) {
-        if window == nil {
-            createWindow()
-        }
+    enum Position { case center, top }
+
+    func show(playSound: Bool = true, position: Position = .center) {
+        createWindowsIfNeeded()
+
+        let activeScreen = activeScreenForMouse()
+        let window = window(for: position)
+
+        positionWindow(window, on: activeScreen, position: position)
+        inactiveWindow(for: position)?.orderOut(nil)
+
         window?.orderFrontRegardless()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        #if DEBUG
+        let pos = position
+        NSLog("=== Window positioning (immediate) ===")
+        NSLog("Position: \(pos == .center ? "center" : "top")")
+        NSLog("Screen '\(activeScreen.localizedName)': frame=\(activeScreen.frame)")
+        NSLog("Window frame: \(window?.frame ?? .zero)")
+        NSLog("ContentView frame: \(window?.contentView?.frame ?? .zero)")
+        if let hv = window?.contentView {
+            NSLog("ContentView fittingSize: \(hv.fittingSize)")
+        }
+        // Check again after SwiftUI layout
+        let windowRef = window
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard let win = windowRef else { return }
+            NSLog("=== Window positioning (after 0.5s) ===")
+            NSLog("Window frame: \(win.frame)")
+            NSLog("ContentView frame: \(win.contentView?.frame ?? .zero)")
+            if let hv = win.contentView {
+                NSLog("ContentView fittingSize: \(hv.fittingSize)")
+            }
+        }
+        #endif
 
         if playSound {
             NSSound(named: "Purr")?.play()
@@ -187,35 +225,102 @@ class OverlayWindowController: NSObject, ObservableObject {
     }
 
     func dismiss() {
-        window?.orderOut(nil)
+        centerWindow?.orderOut(nil)
+        topWindow?.orderOut(nil)
     }
 
-    private func createWindow() {
-        let contentView = OverlayView(controller: self)
-        let hostingView = NSHostingView(rootView: contentView)
+    private func createWindowsIfNeeded() {
+        if centerWindow == nil {
+            centerWindow = makeWindow(
+                size: Metrics.centerSize,
+                rootView: OverlayView(controller: self, layout: .center)
+                    .frame(width: Metrics.centerSize.width, height: Metrics.centerSize.height)
+            )
+        }
 
-        let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
-        let windowWidth: CGFloat = 420
-        let windowHeight: CGFloat = 420
-        let windowX = screenFrame.midX - windowWidth / 2
-        let windowY = screenFrame.midY - windowHeight / 2 + 80
+        if topWindow == nil {
+            topWindow = makeWindow(
+                size: Metrics.topSize,
+                rootView: OverlayView(controller: self, layout: .top)
+                    .frame(width: Metrics.topSize.width, height: Metrics.topSize.height, alignment: .top)
+            )
+        }
+    }
+
+    private func makeWindow<Content: View>(size: NSSize, rootView: Content) -> NSWindow {
+        let hostingView = NSHostingView(
+            rootView: rootView
+        )
+        hostingView.frame = NSRect(origin: .zero, size: size)
 
         let win = NSWindow(
-            contentRect: NSRect(x: windowX, y: windowY, width: windowWidth, height: windowHeight),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
         win.contentView = hostingView
         win.isReleasedWhenClosed = false
-        win.level = .floating
+        win.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)))
         win.isMovableByWindowBackground = true
         win.backgroundColor = .clear
         win.isOpaque = false
         win.hasShadow = true
         win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        win.contentMinSize = size
+        win.contentMaxSize = size
+        win.setContentSize(size)
+        return win
+    }
 
-        self.window = win
+    private func activeScreenForMouse() -> NSScreen {
+        let mouseLocation = NSEvent.mouseLocation
+        return NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
+            ?? NSScreen.main
+            ?? NSScreen.screens.first!
+    }
+
+    private func window(for position: Position) -> NSWindow? {
+        switch position {
+        case .center:
+            return centerWindow
+        case .top:
+            return topWindow
+        }
+    }
+
+    private func inactiveWindow(for position: Position) -> NSWindow? {
+        switch position {
+        case .center:
+            return topWindow
+        case .top:
+            return centerWindow
+        }
+    }
+
+    private func positionWindow(_ window: NSWindow?, on screen: NSScreen, position: Position) {
+        guard let window else { return }
+
+        let size = window.frame.size
+        let screenFrame = screen.frame
+        let origin: NSPoint
+
+        switch position {
+        case .center:
+            origin = NSPoint(
+                x: screenFrame.midX - size.width / 2,
+                y: screenFrame.midY - size.height / 2
+            )
+        case .top:
+            // Use visibleFrame so the dialog sits below the menu bar / notch
+            let visibleFrame = screen.visibleFrame
+            origin = NSPoint(
+                x: screenFrame.midX - size.width / 2,
+                y: visibleFrame.maxY - size.height + Metrics.topShadowCompensation
+            )
+        }
+
+        window.setFrameOrigin(origin)
     }
 }
 
@@ -257,128 +362,194 @@ struct RainbowBar: View {
 // MARK: - Overlay View (AI Wow styled)
 
 struct OverlayView: View {
+    enum Layout {
+        case center
+        case top
+    }
+
     @ObservedObject var controller: OverlayWindowController
+    let layout: Layout
 
     var body: some View {
         VStack(spacing: 0) {
-            // Rainbow bar at top
             RainbowBar()
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
 
-            VStack(spacing: 16) {
-                Spacer().frame(height: 8)
-
-                // Doge image
-                if let img = controller.dogeImage {
-                    Image(nsImage: img)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 120, height: 120)
-                        .clipShape(Circle())
-                        .shadow(color: Palette.suiPink.opacity(0.3), radius: 8, y: 4)
-                }
-
-                // Message
-                Text(controller.message)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    .foregroundColor(Palette.suiInk)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 28)
-
-                // Subtitle
-                if !controller.subtitle.isEmpty {
-                    Text(controller.subtitle)
-                        .font(.system(size: 13, weight: .regular, design: .rounded))
-                        .foregroundColor(Palette.suiGray)
-                }
-
-                // Countdown
-                if controller.showCountdown {
-                    Text(controller.countdownText)
-                        .font(.system(size: 40, weight: .light, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(Palette.suiOrange)
-                }
-
-                Spacer().frame(height: 4)
-
-                // Buttons
-                HStack(spacing: 14) {
-                    if controller.showSnooze {
-                        Button(action: { controller.onSnooze?() }) {
-                            Text("Snooze 10 min")
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Palette.suiGray.opacity(0.3), lineWidth: 1.5)
-                                        .background(RoundedRectangle(cornerRadius: 10).fill(Palette.suiPaperDark))
-                                )
-                                .foregroundColor(Palette.suiInk)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if controller.showTakeBreak {
-                        Button(action: { controller.onTakeBreak?() }) {
-                            Text("Take a break")
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Palette.suiPink)
-                                )
-                                .foregroundColor(.white)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if controller.showLockNow {
-                        Button(action: { controller.onLockNow?() }) {
-                            Text("Lock now")
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Palette.suiCyan)
-                                )
-                                .foregroundColor(.white)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if controller.showFiveMore {
-                        Button(action: { controller.onFiveMore?() }) {
-                            Text("5 more minutes")
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Palette.suiGray.opacity(0.3), lineWidth: 1.5)
-                                        .background(RoundedRectangle(cornerRadius: 10).fill(Palette.suiPaperDark))
-                                )
-                                .foregroundColor(Palette.suiInk)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                Spacer().frame(height: 12)
-            }
-            .frame(maxWidth: .infinity)
-            .background(Palette.suiPaper)
+            content
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: layout == .top ? .top : .center)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.08), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if layout == .top {
+            compactContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        } else {
+            fullContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        }
+    }
+
+    // Two-column compact layout: doge on left, text+buttons on right
+    private var compactContent: some View {
+        HStack(spacing: 16) {
+            if let img = controller.dogeImage {
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 80, height: 80)
+                    .clipShape(Circle())
+                    .shadow(color: Palette.suiPink.opacity(0.3), radius: 6, y: 3)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(controller.message)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(Palette.suiInk)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !controller.subtitle.isEmpty {
+                    Text(controller.subtitle)
+                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .foregroundColor(Palette.suiGray)
+                }
+
+                HStack(spacing: 10) {
+                    if controller.showCountdown {
+                        Text(controller.countdownText)
+                            .font(.system(size: 28, weight: .light, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(Palette.suiOrange)
+                    }
+
+                    actionButtons
+                }
+            }
+        }
+        .padding(.leading, 20)
+        .padding(.trailing, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Palette.suiPaper)
+    }
+
+    // Full centered layout for break alerts and nag
+    private var fullContent: some View {
+        VStack(spacing: 16) {
+            Spacer().frame(height: 8)
+
+            if let img = controller.dogeImage {
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 120, height: 120)
+                    .clipShape(Circle())
+                    .shadow(color: Palette.suiPink.opacity(0.3), radius: 8, y: 4)
+            }
+
+            Text(controller.message)
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundColor(Palette.suiInk)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 28)
+
+            if !controller.subtitle.isEmpty {
+                Text(controller.subtitle)
+                    .font(.system(size: 13, weight: .regular, design: .rounded))
+                    .foregroundColor(Palette.suiGray)
+            }
+
+            if controller.showCountdown {
+                Text(controller.countdownText)
+                    .font(.system(size: 40, weight: .light, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(Palette.suiOrange)
+            }
+
+            Spacer().frame(height: 4)
+
+            actionButtons
+
+            Spacer().frame(height: 12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .background(Palette.suiPaper)
+    }
+
+    // Shared buttons
+    private var actionButtons: some View {
+        HStack(spacing: 14) {
+            if controller.showSnooze {
+                Button(action: { controller.onSnooze?() }) {
+                    Text("Snooze 10 min")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Palette.suiGray.opacity(0.3), lineWidth: 1.5)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Palette.suiPaperDark))
+                        )
+                        .foregroundColor(Palette.suiInk)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if controller.showTakeBreak {
+                Button(action: { controller.onTakeBreak?() }) {
+                    Text("Take a break")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Palette.suiPink)
+                        )
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if controller.showLockNow {
+                Button(action: { controller.onLockNow?() }) {
+                    Text("Lock now")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Palette.suiCyan)
+                        )
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if controller.showFiveMore {
+                Button(action: { controller.onFiveMore?() }) {
+                    Text("5 more minutes")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Palette.suiGray.opacity(0.3), lineWidth: 1.5)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Palette.suiPaperDark))
+                        )
+                        .foregroundColor(Palette.suiInk)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
 
@@ -387,7 +558,7 @@ struct OverlayView: View {
 class TakeBreakController: NSObject {
     private var statusItem: NSStatusItem!
     private var overlayController = OverlayWindowController()
-    private var dimWindow: NSWindow?
+    private var dimWindows: [NSWindow] = []
 
     private var phase: AppPhase = .idle
     private var workStartTime: Date?
@@ -528,7 +699,7 @@ class TakeBreakController: NSObject {
             guard let self = self else { return }
             self.cancelAllTimers()
             self.overlayController.dismiss()
-            self.dimWindow?.orderOut(nil)
+            self.hideDim()
             self.phase = .idle
             self.workStartTime = nil
             self.snoozeCount = 0
@@ -627,8 +798,9 @@ class TakeBreakController: NSObject {
         overlayController.onSnooze = { [weak self] in self?.snooze() }
         overlayController.onTakeBreak = { [weak self] in self?.takeBreak() }
 
-        showDim()
-        overlayController.show()
+        overlayController.isCompact = false
+        showDim(opacity: 0.4)
+        overlayController.show(position: .center)
         updateMenuBarDisplay()
     }
 
@@ -672,6 +844,9 @@ class TakeBreakController: NSObject {
 
         overlayController.onLockNow = { [weak self] in self?.lockScreen() }
 
+        overlayController.isCompact = true
+        showDim(opacity: 0.1)
+        overlayController.show(playSound: false, position: .top)
         updateMenuBarDisplay()
     }
 
@@ -692,8 +867,9 @@ class TakeBreakController: NSObject {
         overlayController.onLockNow = { [weak self] in self?.lockScreen() }
         overlayController.onFiveMore = { [weak self] in self?.fiveMoreMinutes() }
 
-        showDim()
-        overlayController.show()
+        overlayController.isCompact = false
+        showDim(opacity: 0.4)
+        overlayController.show(position: .center)
         updateMenuBarDisplay()
     }
 
@@ -714,34 +890,39 @@ class TakeBreakController: NSObject {
 
         overlayController.onLockNow = { [weak self] in self?.lockScreen() }
 
+        overlayController.isCompact = true
+        showDim(opacity: 0.1)
+        overlayController.show(playSound: false, position: .top)
         updateMenuBarDisplay()
     }
 
     // MARK: - Screen Dim
 
-    private func showDim() {
-        if dimWindow == nil {
-            let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+    private func showDim(opacity: CGFloat = 0.4) {
+        hideDim()
+        for screen in NSScreen.screens {
             let win = NSWindow(
-                contentRect: screenFrame,
+                contentRect: screen.frame,
                 styleMask: [.borderless],
                 backing: .buffered,
                 defer: false
             )
-            win.backgroundColor = NSColor.black.withAlphaComponent(0.4)
+            win.backgroundColor = NSColor.black.withAlphaComponent(opacity)
             win.isOpaque = false
-            win.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)) - 1)
+            win.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)) - 1)
             win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             win.ignoresMouseEvents = true
             win.isReleasedWhenClosed = false
-            dimWindow = win
+            win.orderFrontRegardless()
+            dimWindows.append(win)
         }
-        dimWindow?.setFrame(NSScreen.main?.frame ?? .zero, display: true)
-        dimWindow?.orderFrontRegardless()
     }
 
     private func hideDim() {
-        dimWindow?.orderOut(nil)
+        for win in dimWindows {
+            win.orderOut(nil)
+        }
+        dimWindows.removeAll()
     }
 
     // MARK: - Lock Screen
