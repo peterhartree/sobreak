@@ -2,12 +2,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="BreakReminder"
+APP_NAME="TakeBreak"
 BUILD_DIR="$SCRIPT_DIR/build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 INSTALL_DIR="$HOME/Applications"
 LAUNCH_AGENT_DIR="$HOME/Library/LaunchAgents"
-PLIST_NAME="is.pjh.break-reminder.plist"
+PLIST_NAME="is.pjh.take-break.plist"
 
 # Build release version
 echo "Building release..."
@@ -32,7 +32,7 @@ cat > "$LAUNCH_AGENT_DIR/$PLIST_NAME" << EOF
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>is.pjh.break-reminder</string>
+    <string>is.pjh.take-break</string>
     <key>ProgramArguments</key>
     <array>
         <string>$INSTALL_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME</string>
@@ -54,7 +54,7 @@ echo "Loading LaunchAgent..."
 launchctl bootstrap "gui/$(id -u)" "$LAUNCH_AGENT_DIR/$PLIST_NAME"
 
 echo ""
-echo "Done! Break Reminder is now running and will start automatically on login."
+echo "Done! Take Break is now running and will start automatically on login."
 echo "  App: $INSTALL_DIR/$APP_NAME.app"
 echo "  Agent: $LAUNCH_AGENT_DIR/$PLIST_NAME"
 echo "  Logs: /tmp/break-reminder.log"

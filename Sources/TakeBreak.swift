@@ -380,7 +380,7 @@ struct OverlayView: View {
 
 // MARK: - App Controller
 
-class BreakReminderController: NSObject {
+class TakeBreakController: NSObject {
     private var statusItem: NSStatusItem!
     private var overlayController = OverlayWindowController()
 
@@ -409,7 +409,7 @@ class BreakReminderController: NSObject {
         updateMenuBarDisplay()
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Break Reminder", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Take Break", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
 
         let statusItem = NSMenuItem(title: "Status: Starting...", action: nil, keyEquivalent: "")
@@ -731,7 +731,7 @@ class BreakReminderController: NSObject {
 // MARK: - App Delegate
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    let controller = BreakReminderController()
+    let controller = TakeBreakController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller.start()

@@ -275,8 +275,8 @@ test("Source file exists") {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
     assertTrue(
-        FileManager.default.fileExists(atPath: projectDir.appendingPathComponent("Sources/BreakReminder.swift").path),
-        "BreakReminder.swift should exist"
+        FileManager.default.fileExists(atPath: projectDir.appendingPathComponent("Sources/TakeBreak.swift").path),
+        "TakeBreak.swift should exist"
     )
 }
 
