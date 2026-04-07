@@ -8,6 +8,7 @@ APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 INSTALL_DIR="$HOME/Applications"
 LAUNCH_AGENT_DIR="$HOME/Library/LaunchAgents"
 PLIST_NAME="is.pjh.take-break.plist"
+LABEL="is.pjh.take-break"
 
 # Build release version
 echo "Building release..."
@@ -18,7 +19,7 @@ echo "Installing to $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR"
 if [ -d "$INSTALL_DIR/$APP_NAME.app" ]; then
     # Stop running instance first
-    launchctl bootout "gui/$(id -u)/$PLIST_NAME" 2>/dev/null || true
+    launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
     rm -rf "$INSTALL_DIR/$APP_NAME.app"
 fi
 cp -R "$APP_BUNDLE" "$INSTALL_DIR/"

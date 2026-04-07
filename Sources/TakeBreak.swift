@@ -123,24 +123,28 @@ class MediaDetector {
     static func isMediaActive() -> Bool {
         var assertions: Unmanaged<CFDictionary>?
         let result = IOPMCopyAssertionsByProcess(&assertions)
-        guard result == kIOReturnSuccess, let dict = assertions?.takeRetainedValue() as? [String: [[String: Any]]] else {
+        guard result == kIOReturnSuccess,
+              let cfDict = assertions?.takeRetainedValue() else {
             return false
         }
 
         let mediaTypes: Set<String> = [
             "PreventUserIdleDisplaySleep",
-            "PreventDisplaySleep",
+            "NoDisplaySleepAssertion",
         ]
 
-        let selfPID = ProcessInfo.processInfo.processIdentifier
-        let selfName = ProcessInfo.processInfo.processName
+        let selfPID = Int(ProcessInfo.processInfo.processIdentifier)
 
-        for (processName, assertionList) in dict {
-            if processName == selfName { continue }
+        // IOPMCopyAssertionsByProcess returns {pid_number: [assertion_dict]}
+        let dict = cfDict as NSDictionary
+        for (pidKey, value) in dict {
+            guard let pid = (pidKey as? NSNumber)?.intValue,
+                  pid != selfPID,
+                  let assertionList = value as? [[String: Any]] else { continue }
+
             for assertion in assertionList {
                 if let type = assertion["AssertionType"] as? String ?? assertion["AssertType"] as? String,
                    mediaTypes.contains(type) {
-                    if let pid = assertion["AssertPID"] as? Int32, pid == selfPID { continue }
                     return true
                 }
             }
@@ -383,11 +387,13 @@ struct OverlayView: View {
 class TakeBreakController: NSObject {
     private var statusItem: NSStatusItem!
     private var overlayController = OverlayWindowController()
+    private var dimWindow: NSWindow?
 
     private var phase: AppPhase = .idle
     private var workStartTime: Date?
     private var snoozeCount: Int = 0
     private var graceStartTime: Date?
+    private var graceDuration: TimeInterval = Config.gracePeriod
 
     private var menuBarTimer: Timer?
     private var assertionCheckTimer: Timer?
@@ -512,17 +518,23 @@ class TakeBreakController: NSObject {
     }
 
     @objc private func screenDidUnlock() {
-        startWorking()
+        DispatchQueue.main.async { [weak self] in
+            self?.startWorking()
+        }
     }
 
     @objc private func screenDidLock() {
-        cancelAllTimers()
-        overlayController.dismiss()
-        phase = .idle
-        workStartTime = nil
-        snoozeCount = 0
-        graceStartTime = nil
-        updateMenuBarDisplay()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.cancelAllTimers()
+            self.overlayController.dismiss()
+            self.dimWindow?.orderOut(nil)
+            self.phase = .idle
+            self.workStartTime = nil
+            self.snoozeCount = 0
+            self.graceStartTime = nil
+            self.updateMenuBarDisplay()
+        }
     }
 
     // MARK: - Timer Setup
@@ -550,6 +562,7 @@ class TakeBreakController: NSObject {
 
     private func startWorking() {
         cancelAllTimers()
+        hideDim()
         overlayController.dismiss()
         phase = .working
         workStartTime = workStartTime ?? Date()
@@ -614,6 +627,7 @@ class TakeBreakController: NSObject {
         overlayController.onSnooze = { [weak self] in self?.snooze() }
         overlayController.onTakeBreak = { [weak self] in self?.takeBreak() }
 
+        showDim()
         overlayController.show()
         updateMenuBarDisplay()
     }
@@ -623,6 +637,7 @@ class TakeBreakController: NSObject {
     private func snooze() {
         snoozeCount += 1
         phase = .working
+        hideDim()
         overlayController.dismiss()
 
         snoozeTimer?.invalidate()
@@ -643,6 +658,7 @@ class TakeBreakController: NSObject {
     private func takeBreak() {
         phase = .graceCountdown
         graceStartTime = Date()
+        graceDuration = Config.gracePeriod
 
         overlayController.dogeImage = DogeImage.forGrace.nsImage
         overlayController.message = Messages.graceCountdown
@@ -676,6 +692,7 @@ class TakeBreakController: NSObject {
         overlayController.onLockNow = { [weak self] in self?.lockScreen() }
         overlayController.onFiveMore = { [weak self] in self?.fiveMoreMinutes() }
 
+        showDim()
         overlayController.show()
         updateMenuBarDisplay()
     }
@@ -683,6 +700,7 @@ class TakeBreakController: NSObject {
     private func fiveMoreMinutes() {
         phase = .graceCountdown
         graceStartTime = Date()
+        graceDuration = Config.finalExtension
 
         overlayController.dogeImage = DogeImage.forGrace.nsImage
         overlayController.message = "Five more minutes..."
@@ -699,6 +717,33 @@ class TakeBreakController: NSObject {
         updateMenuBarDisplay()
     }
 
+    // MARK: - Screen Dim
+
+    private func showDim() {
+        if dimWindow == nil {
+            let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+            let win = NSWindow(
+                contentRect: screenFrame,
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false
+            )
+            win.backgroundColor = NSColor.black.withAlphaComponent(0.4)
+            win.isOpaque = false
+            win.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)) - 1)
+            win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            win.ignoresMouseEvents = true
+            win.isReleasedWhenClosed = false
+            dimWindow = win
+        }
+        dimWindow?.setFrame(NSScreen.main?.frame ?? .zero, display: true)
+        dimWindow?.orderFrontRegardless()
+    }
+
+    private func hideDim() {
+        dimWindow?.orderOut(nil)
+    }
+
     // MARK: - Lock Screen
 
     private func lockScreen() {
@@ -713,8 +758,7 @@ class TakeBreakController: NSObject {
     private func graceRemainingSeconds() -> Int {
         guard let start = graceStartTime else { return 0 }
         let elapsed = Date().timeIntervalSince(start)
-        let duration = phase == .nagging ? Config.finalExtension : Config.gracePeriod
-        return max(0, Int(duration - elapsed))
+        return max(0, Int(graceDuration - elapsed))
     }
 
     private func formatCountdown(_ seconds: Int) -> String {

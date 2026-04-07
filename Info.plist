@@ -12,7 +12,7 @@
     <string>1.0</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
-    <key>CFBundlePackageName</key>
+    <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>TakeBreak</string>
