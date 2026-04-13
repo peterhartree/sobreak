@@ -175,6 +175,35 @@ test("Format 1 second") {
     assertEqual(formatCountdown(1), "0:01")
 }
 
+// MARK: - Snooze Countdown Gate Tests
+
+func sourceFileContents() -> String {
+    let projectDir = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let sourcePath = projectDir.appendingPathComponent("Sources/TakeBreak.swift")
+    return (try? String(contentsOf: sourcePath, encoding: .utf8)) ?? ""
+}
+
+test("Snooze confirmation delays are configured") {
+    let source = sourceFileContents()
+    assertTrue(source.contains("static let firstSnoozeConfirmationDelay: TimeInterval = 5"), "First snooze should wait 5 seconds")
+    assertTrue(source.contains("static let repeatedSnoozeConfirmationDelay: TimeInterval = 10"), "Repeated snoozes should wait 10 seconds")
+}
+
+test("Snooze button is disabled until countdown finishes") {
+    let source = sourceFileContents()
+    assertTrue(source.contains("@Published var isSnoozeEnabled: Bool = true"), "Overlay controller should track snooze enabled state")
+    assertTrue(source.contains(".disabled(!controller.isSnoozeEnabled)"), "Snooze button should be disabled during the countdown")
+}
+
+test("Snooze countdown logic depends on snooze count") {
+    let source = sourceFileContents()
+    assertTrue(source.contains("private func snoozeConfirmationDelay() -> TimeInterval"), "Controller should expose snooze countdown timing")
+    assertTrue(source.contains("snoozeCount == 0 ? Config.firstSnoozeConfirmationDelay : Config.repeatedSnoozeConfirmationDelay"), "First snooze should use 5 seconds and later snoozes 10 seconds")
+    assertTrue(source.contains("private func updateSnoozeButtonState(now: Date = Date())"), "Controller should update the snooze button countdown over time")
+}
+
 // MARK: - Grace Remaining Calculation Tests
 
 func graceRemaining(start: Date?, period: TimeInterval, now: Date = Date()) -> Int {

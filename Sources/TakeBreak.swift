@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 import IOKit.pwr_mgt
+import Carbon.HIToolbox
 
 // MARK: - Configuration
 
@@ -25,6 +26,8 @@ struct Config {
 
     static let assertionCheckInterval: TimeInterval = 10
     static let menuBarUpdateInterval: TimeInterval = 1
+    static let firstSnoozeConfirmationDelay: TimeInterval = 5
+    static let repeatedSnoozeConfirmationDelay: TimeInterval = 10
 }
 
 // MARK: - AI Wow Colour Palette
@@ -195,6 +198,7 @@ class OverlayWindowController: NSObject, ObservableObject {
     @Published var dogeImage: NSImage?
     @Published var isCompact: Bool = false
     @Published var snoozeLabel: String = "Snooze 10 min"
+    @Published var isSnoozeEnabled: Bool = true
 
     var onSnooze: (() -> Void)?
     var onTakeBreak: (() -> Void)?
@@ -522,6 +526,8 @@ struct OverlayView: View {
                         .foregroundColor(Palette.suiInk)
                 }
                 .buttonStyle(.plain)
+                .disabled(!controller.isSnoozeEnabled)
+                .opacity(controller.isSnoozeEnabled ? 1 : 0.55)
             }
 
             if controller.showTakeBreak {
@@ -605,6 +611,8 @@ class TakeBreakController: NSObject {
     private var nagTimer: Timer?
 
     private var confirmationWindow: NSWindow?
+    private var snoozeUnlockAt: Date?
+    private var snoozeReadyLabel: String = "Snooze 10 min"
 
     func start() {
         setupMenuBar()
@@ -630,21 +638,27 @@ class TakeBreakController: NSObject {
 
         menu.addItem(NSMenuItem.separator())
 
-        let pomo25 = NSMenuItem(title: "Start 25 min timer", action: #selector(startPomodoro25), keyEquivalent: "")
+        let pomo25 = NSMenuItem(title: "Start 25 min timer", action: #selector(startPomodoro25), keyEquivalent: "t")
+        pomo25.keyEquivalentModifierMask = [.command, .option]
+        pomo25.target = self
         pomo25.tag = 200
         menu.addItem(pomo25)
 
         let pomo45 = NSMenuItem(title: "Start 45 min timer", action: #selector(startPomodoro45), keyEquivalent: "")
+        pomo45.target = self
         pomo45.tag = 201
         menu.addItem(pomo45)
 
         let cancelPomo = NSMenuItem(title: "Cancel timer", action: #selector(cancelPomodoro), keyEquivalent: "")
+        cancelPomo.target = self
         cancelPomo.tag = 202
         cancelPomo.isHidden = true
         menu.addItem(cancelPomo)
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
 
         self.statusItem.menu = menu
     }
@@ -784,6 +798,29 @@ class TakeBreakController: NSObject {
         nagTimer = nil
     }
 
+    private func snoozeConfirmationDelay() -> TimeInterval {
+        snoozeCount == 0 ? Config.firstSnoozeConfirmationDelay : Config.repeatedSnoozeConfirmationDelay
+    }
+
+    private func updateSnoozeButtonState(now: Date = Date()) {
+        guard phase == .alertShown, overlayController.showSnooze else {
+            overlayController.isSnoozeEnabled = true
+            overlayController.snoozeLabel = snoozeReadyLabel
+            return
+        }
+
+        guard let snoozeUnlockAt else {
+            overlayController.isSnoozeEnabled = true
+            overlayController.snoozeLabel = snoozeReadyLabel
+            return
+        }
+
+        let remaining = max(0, Int(ceil(snoozeUnlockAt.timeIntervalSince(now))))
+        let isReady = remaining == 0
+        overlayController.isSnoozeEnabled = isReady
+        overlayController.snoozeLabel = isReady ? snoozeReadyLabel : "\(snoozeReadyLabel) (\(remaining)s)"
+    }
+
     // MARK: - Core Logic
 
     private func startWorking() {
@@ -795,12 +832,20 @@ class TakeBreakController: NSObject {
         snoozeCount = 0
         snoozeUntil = nil
         graceStartTime = nil
+        snoozeUnlockAt = nil
+        overlayController.isSnoozeEnabled = true
+        overlayController.showSnooze = true
+        overlayController.snoozeLabel = snoozeReadyLabel
         NSLog("[TakeBreak] Started working, timer from \(workStartTime!)")
         updateMenuBarDisplay()
     }
 
     private func tick() {
         updateMenuBarDisplay()
+
+        if phase == .alertShown {
+            updateSnoozeButtonState()
+        }
 
         if phase == .graceCountdown {
             let remaining = graceRemainingSeconds()
@@ -857,12 +902,16 @@ class TakeBreakController: NSObject {
         overlayController.message = message
         overlayController.subtitle = snoozeCount > 0 ? "Snoozed \(snoozeCount) time\(snoozeCount == 1 ? "" : "s") · \(elapsed) min active" : "\(elapsed) min of continuous work"
         let nextSnoozeMins = snoozeCount == 0 ? Int(Config.snoozeDuration / 60) : Int(Config.shortSnoozeDuration / 60)
-        overlayController.snoozeLabel = "Snooze \(nextSnoozeMins) min"
+        snoozeReadyLabel = "Snooze \(nextSnoozeMins) min"
+        snoozeUnlockAt = Date().addingTimeInterval(snoozeConfirmationDelay())
+        overlayController.snoozeLabel = snoozeReadyLabel
         overlayController.showSnooze = true
         overlayController.showTakeBreak = true
         overlayController.showLockNow = false
         overlayController.showFiveMore = false
         overlayController.showCountdown = false
+
+        updateSnoozeButtonState()
 
         overlayController.onSnooze = { [weak self] in self?.snooze() }
         overlayController.onTakeBreak = { [weak self] in self?.takeBreak() }
@@ -876,6 +925,13 @@ class TakeBreakController: NSObject {
     // MARK: - Snooze
 
     private func snooze() {
+        updateSnoozeButtonState()
+        guard overlayController.isSnoozeEnabled else {
+            NSLog("[TakeBreak] Snooze click ignored — confirmation countdown still active")
+            return
+        }
+
+        snoozeUnlockAt = nil
         snoozeCount += 1
         let duration = snoozeCount <= 1 ? Config.snoozeDuration : Config.shortSnoozeDuration
         phase = .working
@@ -908,6 +964,7 @@ class TakeBreakController: NSObject {
         phase = .graceCountdown
         graceStartTime = Date()
         graceDuration = Config.gracePeriod
+        snoozeUnlockAt = nil
 
         overlayController.dogeImage = DogeImage.forGrace.nsImage
         overlayController.message = Messages.graceCountdown
@@ -1028,32 +1085,39 @@ class TakeBreakController: NSObject {
 
     // MARK: - Global Hotkey (Cmd+Option+T)
 
+    private var hotkeyRef: EventHotKeyRef?
+
     private func setupGlobalHotkey() {
-        NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // Cmd+Option+T
-            if event.modifierFlags.contains([.command, .option]),
-               event.charactersIgnoringModifiers == "t" {
-                DispatchQueue.main.async {
-                    self?.startPomodoro(minutes: 25)
-                    self?.showConfirmationToast("25 min timer started")
-                }
+        let hotkeyID = EventHotKeyID(signature: OSType(0x5442524B), id: 1) // "TBRK"
+        // kVK_ANSI_T = 0x11, cmdKey + optionKey
+        let modifiers: UInt32 = UInt32(cmdKey | optionKey)
+
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+
+        // Install handler using a C function pointer
+        let controller = Unmanaged.passUnretained(self).toOpaque()
+        InstallEventHandler(GetApplicationEventTarget(), { (_, event, userData) -> OSStatus in
+            guard let userData = userData else { return OSStatus(eventNotHandledErr) }
+            let controller = Unmanaged<TakeBreakController>.fromOpaque(userData).takeUnretainedValue()
+            DispatchQueue.main.async {
+                controller.startPomodoro(minutes: 25)
+                controller.showConfirmationToast("25 min timer started")
             }
-        }
-        // Also monitor when app is focused
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.modifierFlags.contains([.command, .option]),
-               event.charactersIgnoringModifiers == "t" {
-                DispatchQueue.main.async {
-                    self?.startPomodoro(minutes: 25)
-                    self?.showConfirmationToast("25 min timer started")
-                }
-                return nil
-            }
-            return event
+            return noErr
+        }, 1, &eventType, controller, nil)
+
+        var hotKeyRef: EventHotKeyRef?
+        RegisterEventHotKey(UInt32(kVK_ANSI_T), modifiers, hotkeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        self.hotkeyRef = hotKeyRef
+
+        if hotKeyRef != nil {
+            NSLog("[TakeBreak] Registered global hotkey Cmd+Option+T")
+        } else {
+            NSLog("[TakeBreak] Failed to register global hotkey")
         }
     }
 
-    private func showConfirmationToast(_ text: String) {
+    func showConfirmationToast(_ text: String) {
         confirmationWindow?.orderOut(nil)
 
         let label = NSTextField(labelWithString: text)
@@ -1110,7 +1174,7 @@ class TakeBreakController: NSObject {
         startPomodoro(minutes: 45)
     }
 
-    private func startPomodoro(minutes: Int) {
+    func startPomodoro(minutes: Int) {
         let duration = TimeInterval(minutes * 60)
         customWorkDuration = duration
         cancelAllTimers()
@@ -1121,6 +1185,7 @@ class TakeBreakController: NSObject {
         snoozeCount = 0
         snoozeUntil = nil
         graceStartTime = nil
+        snoozeUnlockAt = nil
         NSLog("[TakeBreak] Started \(minutes) min pomodoro timer")
         updatePomodoroMenuItems()
         updateMenuBarDisplay()
@@ -1136,6 +1201,7 @@ class TakeBreakController: NSObject {
         snoozeCount = 0
         snoozeUntil = nil
         graceStartTime = nil
+        snoozeUnlockAt = nil
         NSLog("[TakeBreak] Cancelled pomodoro, back to default 60 min timer")
         updatePomodoroMenuItems()
         updateMenuBarDisplay()
