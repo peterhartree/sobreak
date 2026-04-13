@@ -8,14 +8,16 @@ struct Config {
     #if DEBUG
     static let workDuration: TimeInterval = 5           // 5 seconds for testing
     static let amberWarning: TimeInterval = 3            // amber at 3s
-    static let snoozeDuration: TimeInterval = 600        // 10 minutes
+    static let snoozeDuration: TimeInterval = 600        // 10 minutes (first snooze)
+    static let shortSnoozeDuration: TimeInterval = 300   // 5 minutes (subsequent snoozes)
     static let gracePeriod: TimeInterval = 120           // 2 minutes
     static let nagAfter: TimeInterval = 300              // 5 minutes
     static let finalExtension: TimeInterval = 300        // 5 more minutes
     #else
     static let workDuration: TimeInterval = 3600         // 60 minutes
     static let amberWarning: TimeInterval = 3300         // 55 minutes
-    static let snoozeDuration: TimeInterval = 600        // 10 minutes
+    static let snoozeDuration: TimeInterval = 600        // 10 minutes (first snooze)
+    static let shortSnoozeDuration: TimeInterval = 300   // 5 minutes (subsequent snoozes)
     static let gracePeriod: TimeInterval = 120           // 2 minutes
     static let nagAfter: TimeInterval = 300              // 5 minutes
     static let finalExtension: TimeInterval = 300        // 5 more minutes
@@ -120,12 +122,21 @@ enum AppPhase {
 // MARK: - Power Assertion Checker
 
 class MediaDetector {
+    /// Returns true if any process (other than ourselves) holds a display-sleep power assertion,
+    /// which typically indicates video playback or a video call is active.
     static func isMediaActive() -> Bool {
+        let (active, details) = checkAssertions()
+        NSLog("[TakeBreak] Media check: active=\(active)\(details.isEmpty ? "" : " — \(details)")")
+        return active
+    }
+
+    /// Check assertions and return (isActive, description of what was found)
+    static func checkAssertions() -> (Bool, String) {
         var assertions: Unmanaged<CFDictionary>?
         let result = IOPMCopyAssertionsByProcess(&assertions)
         guard result == kIOReturnSuccess,
               let cfDict = assertions?.takeRetainedValue() else {
-            return false
+            return (false, "IOPMCopyAssertionsByProcess failed")
         }
 
         let mediaTypes: Set<String> = [
@@ -134,6 +145,7 @@ class MediaDetector {
         ]
 
         let selfPID = Int(ProcessInfo.processInfo.processIdentifier)
+        var found: [(pid: Int, type: String, name: String)] = []
 
         // IOPMCopyAssertionsByProcess returns {pid_number: [assertion_dict]}
         let dict = cfDict as NSDictionary
@@ -145,11 +157,18 @@ class MediaDetector {
             for assertion in assertionList {
                 if let type = assertion["AssertionType"] as? String ?? assertion["AssertType"] as? String,
                    mediaTypes.contains(type) {
-                    return true
+                    let name = assertion["Process Name"] as? String ?? "pid:\(pid)"
+                    found.append((pid: pid, type: type, name: name))
                 }
             }
         }
-        return false
+
+        if found.isEmpty {
+            return (false, "no display-sleep assertions held")
+        }
+
+        let details = found.map { "\($0.name)(\($0.pid)):\($0.type)" }.joined(separator: ", ")
+        return (true, details)
     }
 }
 
@@ -175,6 +194,7 @@ class OverlayWindowController: NSObject, ObservableObject {
     @Published var showCountdown: Bool = false
     @Published var dogeImage: NSImage?
     @Published var isCompact: Bool = false
+    @Published var snoozeLabel: String = "Snooze 10 min"
 
     var onSnooze: (() -> Void)?
     var onTakeBreak: (() -> Void)?
@@ -490,7 +510,7 @@ struct OverlayView: View {
         HStack(spacing: 14) {
             if controller.showSnooze {
                 Button(action: { controller.onSnooze?() }) {
-                    Text("Snooze 10 min")
+                    Text(controller.snoozeLabel)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -563,8 +583,20 @@ class TakeBreakController: NSObject {
     private var phase: AppPhase = .idle
     private var workStartTime: Date?
     private var snoozeCount: Int = 0
+    private var snoozeUntil: Date?
     private var graceStartTime: Date?
     private var graceDuration: TimeInterval = Config.gracePeriod
+    private var customWorkDuration: TimeInterval?
+
+    /// The active work duration — custom pomodoro or default 60 min.
+    private var effectiveWorkDuration: TimeInterval {
+        customWorkDuration ?? Config.workDuration
+    }
+
+    /// Amber warning starts 5 minutes before the effective deadline.
+    private var effectiveAmberWarning: TimeInterval {
+        max(0, effectiveWorkDuration - (Config.workDuration - Config.amberWarning))
+    }
 
     private var menuBarTimer: Timer?
     private var assertionCheckTimer: Timer?
@@ -572,10 +604,13 @@ class TakeBreakController: NSObject {
     private var graceTimer: Timer?
     private var nagTimer: Timer?
 
+    private var confirmationWindow: NSWindow?
+
     func start() {
         setupMenuBar()
         setupNotifications()
         setupTimers()
+        setupGlobalHotkey()
         startWorking()
     }
 
@@ -594,6 +629,21 @@ class TakeBreakController: NSObject {
         menu.addItem(statusItem)
 
         menu.addItem(NSMenuItem.separator())
+
+        let pomo25 = NSMenuItem(title: "Start 25 min timer", action: #selector(startPomodoro25), keyEquivalent: "")
+        pomo25.tag = 200
+        menu.addItem(pomo25)
+
+        let pomo45 = NSMenuItem(title: "Start 45 min timer", action: #selector(startPomodoro45), keyEquivalent: "")
+        pomo45.tag = 201
+        menu.addItem(pomo45)
+
+        let cancelPomo = NSMenuItem(title: "Cancel timer", action: #selector(cancelPomodoro), keyEquivalent: "")
+        cancelPomo.tag = 202
+        cancelPomo.isHidden = true
+        menu.addItem(cancelPomo)
+
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
 
         self.statusItem.menu = menu
@@ -610,16 +660,16 @@ class TakeBreakController: NSObject {
         case .working, .alertPending:
             let elapsed = workStartTime.map { Date().timeIntervalSince($0) } ?? 0
             let minutes = Int(elapsed) / 60
-            let remaining = max(0, Int(Config.workDuration - elapsed))
+            let remaining = max(0, Int(effectiveWorkDuration - elapsed))
             let remainingMin = (remaining + 59) / 60
 
-            if elapsed >= Config.workDuration {
+            if elapsed >= effectiveWorkDuration {
                 // Overdue - solid red circle
                 button.attributedTitle = NSAttributedString(
                     string: "●",
                     attributes: [.foregroundColor: NSColor.systemRed, .font: NSFont.systemFont(ofSize: 16, weight: .bold), .baselineOffset: -2.0]
                 )
-            } else if elapsed >= Config.amberWarning {
+            } else if elapsed >= effectiveAmberWarning {
                 // Last 5 minutes - countdown in orange
                 button.attributedTitle = NSAttributedString(
                     string: "\(remainingMin)m",
@@ -689,12 +739,14 @@ class TakeBreakController: NSObject {
     }
 
     @objc private func screenDidUnlock() {
+        NSLog("[TakeBreak] Screen unlocked")
         DispatchQueue.main.async { [weak self] in
             self?.startWorking()
         }
     }
 
     @objc private func screenDidLock() {
+        NSLog("[TakeBreak] Screen locked — resetting all state")
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.cancelAllTimers()
@@ -703,7 +755,10 @@ class TakeBreakController: NSObject {
             self.phase = .idle
             self.workStartTime = nil
             self.snoozeCount = 0
+            self.snoozeUntil = nil
             self.graceStartTime = nil
+            self.customWorkDuration = nil
+            self.updatePomodoroMenuItems()
             self.updateMenuBarDisplay()
         }
     }
@@ -738,7 +793,9 @@ class TakeBreakController: NSObject {
         phase = .working
         workStartTime = workStartTime ?? Date()
         snoozeCount = 0
+        snoozeUntil = nil
         graceStartTime = nil
+        NSLog("[TakeBreak] Started working, timer from \(workStartTime!)")
         updateMenuBarDisplay()
     }
 
@@ -754,9 +811,17 @@ class TakeBreakController: NSObject {
         }
 
         if phase == .working, let start = workStartTime {
+            // Don't trigger during snooze period
+            if let snoozeDeadline = snoozeUntil, Date() < snoozeDeadline {
+                return
+            }
+
             let elapsed = Date().timeIntervalSince(start)
-            if elapsed >= Config.workDuration {
+            if elapsed >= effectiveWorkDuration {
                 if MediaDetector.isMediaActive() {
+                    if phase != .alertPending {
+                        NSLog("[TakeBreak] Alert deferred — media/call active")
+                    }
                     phase = .alertPending
                 } else {
                     showBreakAlert()
@@ -767,6 +832,7 @@ class TakeBreakController: NSObject {
 
     private func checkAssertions() {
         if phase == .alertPending && !MediaDetector.isMediaActive() {
+            NSLog("[TakeBreak] Media no longer active — showing deferred alert")
             showBreakAlert()
         }
     }
@@ -774,6 +840,7 @@ class TakeBreakController: NSObject {
     // MARK: - Break Alert
 
     private func showBreakAlert() {
+        NSLog("[TakeBreak] Showing break alert (snoozeCount: \(snoozeCount))")
         phase = .alertShown
 
         let message: String
@@ -789,6 +856,8 @@ class TakeBreakController: NSObject {
         overlayController.dogeImage = DogeImage.forAlert(snoozeCount: snoozeCount).nsImage
         overlayController.message = message
         overlayController.subtitle = snoozeCount > 0 ? "Snoozed \(snoozeCount) time\(snoozeCount == 1 ? "" : "s") · \(elapsed) min active" : "\(elapsed) min of continuous work"
+        let nextSnoozeMins = snoozeCount == 0 ? Int(Config.snoozeDuration / 60) : Int(Config.shortSnoozeDuration / 60)
+        overlayController.snoozeLabel = "Snooze \(nextSnoozeMins) min"
         overlayController.showSnooze = true
         overlayController.showTakeBreak = true
         overlayController.showLockNow = false
@@ -808,16 +877,23 @@ class TakeBreakController: NSObject {
 
     private func snooze() {
         snoozeCount += 1
+        let duration = snoozeCount <= 1 ? Config.snoozeDuration : Config.shortSnoozeDuration
         phase = .working
+        snoozeUntil = Date().addingTimeInterval(duration)
         hideDim()
         overlayController.dismiss()
+        NSLog("[TakeBreak] Snoozed (count: \(snoozeCount), duration: \(Int(duration/60)) min), next alert after \(snoozeUntil!)")
 
         snoozeTimer?.invalidate()
-        snoozeTimer = Timer.scheduledTimer(withTimeInterval: Config.snoozeDuration, repeats: false) { [weak self] _ in
+        snoozeTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
             guard let self = self, self.phase == .working else { return }
+            self.snoozeUntil = nil
+            NSLog("[TakeBreak] Snooze timer fired, checking media...")
             if MediaDetector.isMediaActive() {
+                NSLog("[TakeBreak] Media active after snooze — deferring alert")
                 self.phase = .alertPending
             } else {
+                NSLog("[TakeBreak] No media active — showing break alert")
                 self.showBreakAlert()
             }
         }
@@ -828,6 +904,7 @@ class TakeBreakController: NSObject {
     // MARK: - Take a Break (Grace Period)
 
     private func takeBreak() {
+        NSLog("[TakeBreak] User chose 'Take a break' — starting grace countdown")
         phase = .graceCountdown
         graceStartTime = Date()
         graceDuration = Config.gracePeriod
@@ -853,6 +930,7 @@ class TakeBreakController: NSObject {
     // MARK: - Nag
 
     private func showNag() {
+        NSLog("[TakeBreak] Grace period expired — showing nag")
         phase = .nagging
 
         overlayController.dogeImage = DogeImage.forNag.nsImage
@@ -946,6 +1024,133 @@ class TakeBreakController: NSObject {
         let m = seconds / 60
         let s = seconds % 60
         return String(format: "%d:%02d", m, s)
+    }
+
+    // MARK: - Global Hotkey (Cmd+Option+T)
+
+    private func setupGlobalHotkey() {
+        NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // Cmd+Option+T
+            if event.modifierFlags.contains([.command, .option]),
+               event.charactersIgnoringModifiers == "t" {
+                DispatchQueue.main.async {
+                    self?.startPomodoro(minutes: 25)
+                    self?.showConfirmationToast("25 min timer started")
+                }
+            }
+        }
+        // Also monitor when app is focused
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.modifierFlags.contains([.command, .option]),
+               event.charactersIgnoringModifiers == "t" {
+                DispatchQueue.main.async {
+                    self?.startPomodoro(minutes: 25)
+                    self?.showConfirmationToast("25 min timer started")
+                }
+                return nil
+            }
+            return event
+        }
+    }
+
+    private func showConfirmationToast(_ text: String) {
+        confirmationWindow?.orderOut(nil)
+
+        let label = NSTextField(labelWithString: text)
+        label.font = NSFont.systemFont(ofSize: 14, weight: .medium)
+        label.textColor = Palette.ink
+        label.alignment = .center
+        label.sizeToFit()
+
+        let padding: CGFloat = 24
+        let size = NSSize(width: label.frame.width + padding * 2, height: 40)
+        label.frame = NSRect(x: padding, y: 8, width: label.frame.width, height: label.frame.height)
+
+        let container = NSView(frame: NSRect(origin: .zero, size: size))
+        container.wantsLayer = true
+        container.layer?.backgroundColor = Palette.paper.cgColor
+        container.layer?.cornerRadius = 10
+        container.layer?.borderWidth = 1
+        container.layer?.borderColor = NSColor.black.withAlphaComponent(0.08).cgColor
+        container.addSubview(label)
+
+        let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
+            ?? NSScreen.main ?? NSScreen.screens.first!
+        let origin = NSPoint(
+            x: screen.frame.midX - size.width / 2,
+            y: screen.visibleFrame.maxY - size.height - 8
+        )
+
+        let win = NSWindow(contentRect: NSRect(origin: origin, size: size),
+                           styleMask: [.borderless], backing: .buffered, defer: false)
+        win.contentView = container
+        win.isOpaque = false
+        win.backgroundColor = .clear
+        win.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)))
+        win.hasShadow = true
+        win.isReleasedWhenClosed = false
+        win.orderFrontRegardless()
+        confirmationWindow = win
+
+        NSSound(named: "Tink")?.play()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.confirmationWindow?.orderOut(nil)
+            self?.confirmationWindow = nil
+        }
+    }
+
+    // MARK: - Pomodoro Timers
+
+    @objc private func startPomodoro25() {
+        startPomodoro(minutes: 25)
+    }
+
+    @objc private func startPomodoro45() {
+        startPomodoro(minutes: 45)
+    }
+
+    private func startPomodoro(minutes: Int) {
+        let duration = TimeInterval(minutes * 60)
+        customWorkDuration = duration
+        cancelAllTimers()
+        hideDim()
+        overlayController.dismiss()
+        phase = .working
+        workStartTime = Date()
+        snoozeCount = 0
+        snoozeUntil = nil
+        graceStartTime = nil
+        NSLog("[TakeBreak] Started \(minutes) min pomodoro timer")
+        updatePomodoroMenuItems()
+        updateMenuBarDisplay()
+    }
+
+    @objc private func cancelPomodoro() {
+        customWorkDuration = nil
+        cancelAllTimers()
+        hideDim()
+        overlayController.dismiss()
+        phase = .working
+        workStartTime = Date()
+        snoozeCount = 0
+        snoozeUntil = nil
+        graceStartTime = nil
+        NSLog("[TakeBreak] Cancelled pomodoro, back to default 60 min timer")
+        updatePomodoroMenuItems()
+        updateMenuBarDisplay()
+    }
+
+    private func updatePomodoroMenuItems() {
+        guard let menu = statusItem.menu else { return }
+        let hasCustom = customWorkDuration != nil
+        menu.item(withTag: 200)?.isHidden = hasCustom  // "Start 25 min"
+        menu.item(withTag: 201)?.isHidden = hasCustom  // "Start 45 min"
+        menu.item(withTag: 202)?.isHidden = !hasCustom // "Cancel timer"
+        if hasCustom {
+            let mins = Int(customWorkDuration! / 60)
+            menu.item(withTag: 202)?.title = "Cancel \(mins) min timer"
+        }
     }
 
     @objc private func quitApp() {
