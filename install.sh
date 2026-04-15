@@ -1,6 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
+# Guard: TakeBreak is for the MacBook Pro only. The mini is a headless
+# agent host where break reminders serve no purpose.
+HOST="$(scutil --get LocalHostName 2>/dev/null || hostname -s)"
+if [ "$HOST" = "mini" ]; then
+    echo "Refusing to install on '$HOST'. TakeBreak is mbp-only." >&2
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_NAME="TakeBreak"
 BUILD_DIR="$SCRIPT_DIR/build"

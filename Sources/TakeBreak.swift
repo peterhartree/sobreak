@@ -79,6 +79,19 @@ struct Messages {
     static let graceCountdown = "Wrapping up..."
     static let nagMessage = "Still here? You said you'd take a break."
     static let nagSubtle = "Your break is waiting for you."
+
+    static let pomodoroStarted = [
+        "Let's do this!",
+        "Focus mode: activated.",
+        "You've got this.",
+        "Deep work time.",
+        "Time to make things happen.",
+        "Locked in.",
+        "Here we go!",
+        "The clock is ticking.",
+        "Go time.",
+        "Make it count.",
+    ]
 }
 
 // MARK: - Doge Images
@@ -89,15 +102,24 @@ enum DogeImage: String, CaseIterable {
     case sassy = "doge-sassy"
     case stretch = "doge-stretch"
 
+    /// Load the small (256px) version for UI display. Falls back to the full-size image.
     var nsImage: NSImage? {
+        let smallName = rawValue + "-small"
         let bundle = Bundle.main
+        // Prefer small version
+        if let url = bundle.url(forResource: smallName, withExtension: "png", subdirectory: "images") {
+            return NSImage(contentsOf: url)
+        }
+        // Fall back to full size
         if let url = bundle.url(forResource: rawValue, withExtension: "png", subdirectory: "images") {
             return NSImage(contentsOf: url)
         }
         // Fallback: check relative to executable
         let execURL = URL(fileURLWithPath: CommandLine.arguments[0])
-        let resourcesURL = execURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/images/\(rawValue).png")
-        return NSImage(contentsOf: resourcesURL)
+        let resourcesURL = execURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/images/\(smallName).png")
+        if let img = NSImage(contentsOf: resourcesURL) { return img }
+        let fullURL = execURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/images/\(rawValue).png")
+        return NSImage(contentsOf: fullURL)
     }
 
     /// Pick the right doge for the current situation
@@ -425,12 +447,15 @@ struct OverlayView: View {
     private var compactContent: some View {
         HStack(spacing: 16) {
             if let img = controller.dogeImage {
-                Image(nsImage: img)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 80, height: 80)
-                    .clipShape(Circle())
-                    .shadow(color: Palette.suiPink.opacity(0.3), radius: 6, y: 3)
+                ZStack {
+                    Circle().fill(Color.white).frame(width: 86, height: 86)
+                    Image(nsImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 74, height: 74)
+                        .clipShape(Circle())
+                }
+                .shadow(color: Palette.suiPink.opacity(0.3), radius: 6, y: 3)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -471,12 +496,15 @@ struct OverlayView: View {
             Spacer().frame(height: 8)
 
             if let img = controller.dogeImage {
-                Image(nsImage: img)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 120, height: 120)
-                    .clipShape(Circle())
-                    .shadow(color: Palette.suiPink.opacity(0.3), radius: 8, y: 4)
+                ZStack {
+                    Circle().fill(Color.white).frame(width: 128, height: 128)
+                    Image(nsImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 112, height: 112)
+                        .clipShape(Circle())
+                }
+                .shadow(color: Palette.suiPink.opacity(0.3), radius: 8, y: 4)
             }
 
             Text(controller.message)
@@ -1120,23 +1148,43 @@ class TakeBreakController: NSObject {
     func showConfirmationToast(_ text: String) {
         confirmationWindow?.orderOut(nil)
 
-        let label = NSTextField(labelWithString: text)
-        label.font = NSFont.systemFont(ofSize: 14, weight: .medium)
-        label.textColor = Palette.ink
-        label.alignment = .center
-        label.sizeToFit()
+        let motivation = Messages.pomodoroStarted.randomElement()!
+        let dogeImg = DogeImage.happy.nsImage
 
-        let padding: CGFloat = 24
-        let size = NSSize(width: label.frame.width + padding * 2, height: 40)
-        label.frame = NSRect(x: padding, y: 8, width: label.frame.width, height: label.frame.height)
+        let toastView = HStack(spacing: 20) {
+            if let img = dogeImg {
+                ZStack {
+                    Circle().fill(Color.white).frame(width: 100, height: 100)
+                    Image(nsImage: img)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 88, height: 88)
+                        .clipShape(Circle())
+                }
+                .shadow(color: Palette.suiPink.opacity(0.3), radius: 6, y: 3)
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                Text(text)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundColor(Palette.suiInk)
+                Text(motivation)
+                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .foregroundColor(Palette.suiGray)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 20)
+        .background(Palette.suiPaper)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
 
-        let container = NSView(frame: NSRect(origin: .zero, size: size))
-        container.wantsLayer = true
-        container.layer?.backgroundColor = Palette.paper.cgColor
-        container.layer?.cornerRadius = 10
-        container.layer?.borderWidth = 1
-        container.layer?.borderColor = NSColor.black.withAlphaComponent(0.08).cgColor
-        container.addSubview(label)
+        let size = NSSize(width: 420, height: 140)
+        let hostingView = NSHostingView(rootView: toastView.frame(width: size.width, height: size.height))
+        hostingView.frame = NSRect(origin: .zero, size: size)
 
         let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
             ?? NSScreen.main ?? NSScreen.screens.first!
@@ -1147,7 +1195,7 @@ class TakeBreakController: NSObject {
 
         let win = NSWindow(contentRect: NSRect(origin: origin, size: size),
                            styleMask: [.borderless], backing: .buffered, defer: false)
-        win.contentView = container
+        win.contentView = hostingView
         win.isOpaque = false
         win.backgroundColor = .clear
         win.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)))
@@ -1156,9 +1204,9 @@ class TakeBreakController: NSObject {
         win.orderFrontRegardless()
         confirmationWindow = win
 
-        NSSound(named: "Tink")?.play()
+        NSSound(named: "Blow")?.play()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             self?.confirmationWindow?.orderOut(nil)
             self?.confirmationWindow = nil
         }
