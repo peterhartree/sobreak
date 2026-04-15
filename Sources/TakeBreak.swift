@@ -102,24 +102,23 @@ enum DogeImage: String, CaseIterable {
     case sassy = "doge-sassy"
     case stretch = "doge-stretch"
 
-    /// Load the small (256px) version for UI display. Falls back to the full-size image.
+    /// Load the small (256px) transparent version for UI display.
+    /// Fallback chain: small → transparent → original.
     var nsImage: NSImage? {
-        let smallName = rawValue + "-small"
+        let candidates = [rawValue + "-small", rawValue + "-transparent", rawValue]
         let bundle = Bundle.main
-        // Prefer small version
-        if let url = bundle.url(forResource: smallName, withExtension: "png", subdirectory: "images") {
-            return NSImage(contentsOf: url)
-        }
-        // Fall back to full size
-        if let url = bundle.url(forResource: rawValue, withExtension: "png", subdirectory: "images") {
-            return NSImage(contentsOf: url)
+        for name in candidates {
+            if let url = bundle.url(forResource: name, withExtension: "png", subdirectory: "images") {
+                return NSImage(contentsOf: url)
+            }
         }
         // Fallback: check relative to executable
         let execURL = URL(fileURLWithPath: CommandLine.arguments[0])
-        let resourcesURL = execURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/images/\(smallName).png")
-        if let img = NSImage(contentsOf: resourcesURL) { return img }
-        let fullURL = execURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/images/\(rawValue).png")
-        return NSImage(contentsOf: fullURL)
+        for name in candidates {
+            let url = execURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/images/\(name).png")
+            if let img = NSImage(contentsOf: url) { return img }
+        }
+        return nil
     }
 
     /// Pick the right doge for the current situation
@@ -394,9 +393,9 @@ struct RainbowBar: View {
                 startPoint: UnitPoint(x: offset, y: 0.5),
                 endPoint: UnitPoint(x: offset + 1, y: 0.5)
             )
-            .frame(height: 5)
+            .frame(height: 7)
         }
-        .frame(height: 5)
+        .frame(height: 7)
         .onAppear {
             withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
                 offset = -1
@@ -418,9 +417,6 @@ struct OverlayView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            RainbowBar()
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
-
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: layout == .top ? .top : .center)
@@ -429,7 +425,7 @@ struct OverlayView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
+        .shadow(color: Palette.suiInk.opacity(0.08), radius: 30, y: 12)
     }
 
     @ViewBuilder
@@ -448,14 +444,15 @@ struct OverlayView: View {
         HStack(spacing: 16) {
             if let img = controller.dogeImage {
                 ZStack {
-                    Circle().fill(Color.white).frame(width: 86, height: 86)
+                    Circle().fill(Color.white).frame(width: 82, height: 82)
                     Image(nsImage: img)
                         .resizable()
+                        .interpolation(.high)
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 74, height: 74)
+                        .frame(width: 70, height: 70)
                         .clipShape(Circle())
                 }
-                .shadow(color: Palette.suiPink.opacity(0.3), radius: 6, y: 3)
+                .shadow(color: Palette.suiInk.opacity(0.06), radius: 6, y: 3)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -492,27 +489,28 @@ struct OverlayView: View {
 
     // Full centered layout for break alerts and nag
     private var fullContent: some View {
-        VStack(spacing: 16) {
-            Spacer().frame(height: 8)
+        VStack(spacing: 20) {
+            Spacer().frame(height: 12)
 
             if let img = controller.dogeImage {
                 ZStack {
-                    Circle().fill(Color.white).frame(width: 128, height: 128)
+                    Circle().fill(Color.white).frame(width: 130, height: 130)
                     Image(nsImage: img)
                         .resizable()
+                        .interpolation(.high)
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 112, height: 112)
                         .clipShape(Circle())
                 }
-                .shadow(color: Palette.suiPink.opacity(0.3), radius: 8, y: 4)
+                .shadow(color: Palette.suiInk.opacity(0.06), radius: 8, y: 3)
             }
 
             Text(controller.message)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundColor(Palette.suiInk)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 28)
+                .padding(.horizontal, 32)
 
             if !controller.subtitle.isEmpty {
                 Text(controller.subtitle)
@@ -531,78 +529,93 @@ struct OverlayView: View {
 
             actionButtons
 
-            Spacer().frame(height: 12)
+            Spacer().frame(height: 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .background(Palette.suiPaper)
+        .background(
+            RadialGradient(
+                colors: [Palette.suiPaper, Palette.suiPaperDark],
+                center: .center,
+                startRadius: 20,
+                endRadius: 300
+            )
+        )
     }
 
     // Shared buttons
     private var actionButtons: some View {
-        HStack(spacing: 14) {
+        VStack(spacing: 10) {
+            HStack(spacing: 14) {
+                if controller.showTakeBreak {
+                    PillButton(
+                        title: "Take a break",
+                        gradient: [Palette.suiPink, Color(red: 0.88, green: 0.30, blue: 0.48)],
+                        shadow: Palette.suiPink,
+                        action: { controller.onTakeBreak?() }
+                    )
+                }
+
+                if controller.showLockNow {
+                    PillButton(
+                        title: "Lock now",
+                        gradient: [Palette.suiCyan, Color(red: 0.06, green: 0.62, blue: 0.58)],
+                        shadow: Palette.suiCyan,
+                        action: { controller.onLockNow?() }
+                    )
+                }
+            }
+
             if controller.showSnooze {
                 Button(action: { controller.onSnooze?() }) {
                     Text(controller.snoozeLabel)
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Palette.suiGray.opacity(0.3), lineWidth: 1.5)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(Palette.suiPaperDark))
-                        )
-                        .foregroundColor(Palette.suiInk)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(Palette.suiGray)
                 }
                 .buttonStyle(.plain)
                 .disabled(!controller.isSnoozeEnabled)
-                .opacity(controller.isSnoozeEnabled ? 1 : 0.55)
-            }
-
-            if controller.showTakeBreak {
-                Button(action: { controller.onTakeBreak?() }) {
-                    Text("Take a break")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Palette.suiPink)
-                        )
-                        .foregroundColor(.white)
-                }
-                .buttonStyle(.plain)
-            }
-
-            if controller.showLockNow {
-                Button(action: { controller.onLockNow?() }) {
-                    Text("Lock now")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Palette.suiCyan)
-                        )
-                        .foregroundColor(.white)
-                }
-                .buttonStyle(.plain)
+                .opacity(controller.isSnoozeEnabled ? 1 : 0.4)
             }
 
             if controller.showFiveMore {
                 Button(action: { controller.onFiveMore?() }) {
                     Text("5 more minutes")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Palette.suiGray.opacity(0.3), lineWidth: 1.5)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(Palette.suiPaperDark))
-                        )
-                        .foregroundColor(Palette.suiInk)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(Palette.suiGray)
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+}
+
+// MARK: - Pill Button
+
+struct PillButton: View {
+    let title: String
+    let gradient: [Color]
+    let shadow: Color
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 26)
+                .padding(.vertical, 11)
+                .background(
+                    Capsule()
+                        .fill(LinearGradient(colors: gradient, startPoint: .top, endPoint: .bottom))
+                )
+                .foregroundColor(.white)
+                .shadow(color: shadow.opacity(0.35), radius: 6, y: 3)
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isHovered ? 1.04 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
         }
     }
 }
@@ -1111,38 +1124,104 @@ class TakeBreakController: NSObject {
         return String(format: "%d:%02d", m, s)
     }
 
-    // MARK: - Global Hotkey (Cmd+Option+T)
+    // MARK: - Global Hotkeys
 
-    private var hotkeyRef: EventHotKeyRef?
+    private var hotkeyRefs: [EventHotKeyRef?] = []
+    private var debugPreviewStep: Int = -1
 
     private func setupGlobalHotkey() {
-        let hotkeyID = EventHotKeyID(signature: OSType(0x5442524B), id: 1) // "TBRK"
-        // kVK_ANSI_T = 0x11, cmdKey + optionKey
-        let modifiers: UInt32 = UInt32(cmdKey | optionKey)
-
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-
-        // Install handler using a C function pointer
         let controller = Unmanaged.passUnretained(self).toOpaque()
+
         InstallEventHandler(GetApplicationEventTarget(), { (_, event, userData) -> OSStatus in
-            guard let userData = userData else { return OSStatus(eventNotHandledErr) }
+            guard let userData = userData,
+                  let event = event else { return OSStatus(eventNotHandledErr) }
+
+            var hotkeyID = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject),
+                              EventParamType(typeEventHotKeyID), nil,
+                              MemoryLayout<EventHotKeyID>.size, nil, &hotkeyID)
+
             let controller = Unmanaged<TakeBreakController>.fromOpaque(userData).takeUnretainedValue()
             DispatchQueue.main.async {
-                controller.startPomodoro(minutes: 25)
-                controller.showConfirmationToast("25 min timer started")
+                switch hotkeyID.id {
+                case 1: // Cmd+Option+T — start 25 min pomodoro
+                    controller.startPomodoro(minutes: 25)
+                    controller.showConfirmationToast("25 min timer started")
+                case 2: // Cmd+Option+D — cycle debug preview
+                    controller.cycleDebugPreview()
+                default:
+                    break
+                }
             }
             return noErr
         }, 1, &eventType, controller, nil)
 
-        var hotKeyRef: EventHotKeyRef?
-        RegisterEventHotKey(UInt32(kVK_ANSI_T), modifiers, hotkeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
-        self.hotkeyRef = hotKeyRef
+        let modifiers: UInt32 = UInt32(cmdKey | optionKey)
 
-        if hotKeyRef != nil {
-            NSLog("[TakeBreak] Registered global hotkey Cmd+Option+T")
-        } else {
-            NSLog("[TakeBreak] Failed to register global hotkey")
+        // Hotkey 1: Cmd+Option+T — pomodoro
+        var ref1: EventHotKeyRef?
+        let id1 = EventHotKeyID(signature: OSType(0x5442524B), id: 1)
+        RegisterEventHotKey(UInt32(kVK_ANSI_T), modifiers, id1, GetApplicationEventTarget(), 0, &ref1)
+        hotkeyRefs.append(ref1)
+
+        // Hotkey 2: Cmd+Option+D — debug preview
+        var ref2: EventHotKeyRef?
+        let id2 = EventHotKeyID(signature: OSType(0x5442524B), id: 2)
+        RegisterEventHotKey(UInt32(kVK_ANSI_D), modifiers, id2, GetApplicationEventTarget(), 0, &ref2)
+        hotkeyRefs.append(ref2)
+
+        NSLog("[TakeBreak] Registered global hotkeys: Cmd+Option+T (pomodoro), Cmd+Option+D (debug preview)")
+    }
+
+    // MARK: - Debug Preview (Cmd+Option+D)
+
+    func cycleDebugPreview() {
+        debugPreviewStep += 1
+        if debugPreviewStep > 5 { debugPreviewStep = 0 }
+
+        // Clean up before showing next state
+        overlayController.dismiss()
+        hideDim()
+        confirmationWindow?.orderOut(nil)
+
+        let stepName: String
+        switch debugPreviewStep {
+        case 0:
+            stepName = "Break alert (first time)"
+            snoozeCount = 0
+            showBreakAlert()
+        case 1:
+            stepName = "Break alert (snoozed 2x)"
+            snoozeCount = 2
+            showBreakAlert()
+        case 2:
+            stepName = "Grace countdown"
+            takeBreak()
+        case 3:
+            stepName = "Nag"
+            showNag()
+        case 4:
+            stepName = "Pomodoro toast"
+            overlayController.dismiss()
+            hideDim()
+            showConfirmationToast("25 min timer started")
+        case 5:
+            stepName = "Dismissed"
+            overlayController.dismiss()
+            hideDim()
+            // Restore normal working state
+            phase = .working
+            workStartTime = Date()
+            snoozeCount = 0
+            snoozeUntil = nil
+            graceStartTime = nil
+            updateMenuBarDisplay()
+        default:
+            stepName = "Unknown"
         }
+
+        NSLog("[TakeBreak] Debug preview step \(debugPreviewStep): \(stepName)")
     }
 
     func showConfirmationToast(_ text: String) {
@@ -1151,38 +1230,38 @@ class TakeBreakController: NSObject {
         let motivation = Messages.pomodoroStarted.randomElement()!
         let dogeImg = DogeImage.happy.nsImage
 
-        let toastView = HStack(spacing: 20) {
+        let toastView = HStack(spacing: 18) {
             if let img = dogeImg {
                 ZStack {
-                    Circle().fill(Color.white).frame(width: 100, height: 100)
+                    Circle().fill(Color.white).frame(width: 72, height: 72)
                     Image(nsImage: img)
                         .resizable()
                         .interpolation(.high)
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 88, height: 88)
+                        .frame(width: 60, height: 60)
                         .clipShape(Circle())
                 }
-                .shadow(color: Palette.suiPink.opacity(0.3), radius: 6, y: 3)
+                .shadow(color: Palette.suiInk.opacity(0.06), radius: 4, y: 2)
             }
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(text)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundColor(Palette.suiInk)
                 Text(motivation)
-                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .font(.system(size: 14, weight: .regular, design: .rounded))
                     .foregroundColor(Palette.suiGray)
             }
         }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 16)
         .background(Palette.suiPaper)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.08), lineWidth: 1)
         )
 
-        let size = NSSize(width: 420, height: 140)
+        let size = NSSize(width: 340, height: 104)
         let hostingView = NSHostingView(rootView: toastView.frame(width: size.width, height: size.height))
         hostingView.frame = NSRect(origin: .zero, size: size)
 
