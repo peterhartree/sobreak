@@ -26,255 +26,192 @@
     padding: 40px;
   }
 
-  h1 {
-    font-size: 14px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #666;
-    margin-bottom: 32px;
-  }
-
-  h2 {
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #555;
-    margin: 48px 0 20px;
-  }
-
+  h1 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: #666; margin-bottom: 32px; }
+  h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: #555; margin: 48px 0 20px; }
   h2:first-of-type { margin-top: 0; }
 
-  .row {
-    display: flex;
-    gap: 32px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-  }
+  .row { display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 24px; }
+  .label { font-size: 11px; color: #666; margin-bottom: 8px; font-weight: 500; }
 
-  .label {
-    font-size: 11px;
-    color: #666;
-    margin-bottom: 8px;
-    font-weight: 500;
-  }
-
-  /* ---- Center overlay (break alert, nag) ---- */
+  /* ---- Center overlay ---- */
   .center-overlay {
     width: 400px;
     border-radius: 16px;
-    background: radial-gradient(circle at center, var(--paper), var(--paper-dark));
-    border: 1px solid rgba(0,0,0,0.08);
-    box-shadow: 0 12px 30px rgba(16,15,15,0.08);
     display: flex;
     flex-direction: column;
     align-items: center;
     overflow: hidden;
     padding: 24px 28px 22px;
-    gap: 0;
+    border: 2px solid rgba(0,0,0,0.06);
+    box-shadow: 0 12px 30px rgba(16,15,15,0.08);
+  }
+
+  .center-overlay.mood-happy {
+    background: radial-gradient(circle at 50% 30%, #FFF9E3, #F5F0D8);
+    border-color: var(--yellow);
+    box-shadow: 0 12px 30px rgba(16,15,15,0.08), 0 0 0 1px rgba(240, 196, 48, 0.15);
+  }
+  .center-overlay.mood-nudge {
+    background: radial-gradient(circle at 50% 30%, #FFF6DC, #F2EAD0);
+    border-color: var(--orange);
+    box-shadow: 0 12px 30px rgba(16,15,15,0.08), 0 0 0 1px rgba(232, 117, 10, 0.15);
+  }
+  .center-overlay.mood-sassy {
+    background: radial-gradient(circle at 50% 30%, #FFF2E0, #F0E4D0);
+    border-color: var(--pink);
+    box-shadow: 0 12px 30px rgba(16,15,15,0.08), 0 0 0 1px rgba(232, 54, 143, 0.15);
+  }
+  .center-overlay.mood-nag {
+    background: radial-gradient(circle at 50% 30%, #FFF0E6, #EDE0D4);
+    border-color: var(--pink);
+    box-shadow: 0 12px 30px rgba(16,15,15,0.08), 0 0 0 1px rgba(232, 54, 143, 0.2);
+  }
+
+  .center-overlay .doge-wrap {
+    width: 180px;
+    height: 180px;
   }
 
   .center-overlay .doge {
-    width: 180px;
-    height: 180px;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
+    display: block;
   }
 
-  .center-overlay .message {
-    font-size: 21px;
-    font-weight: 600;
-    color: var(--ink);
-    text-align: center;
-    line-height: 1.3;
-    margin-top: 14px;
+  .center-overlay .message { font-size: 21px; font-weight: 600; color: var(--ink); text-align: center; line-height: 1.3; margin-top: 14px; }
+  .center-overlay .subtitle { font-size: 13px; color: var(--gray); margin-top: 5px; }
+  .center-overlay .buttons { margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .center-overlay .buttons .row { gap: 12px; margin-bottom: 0; }
+
+  /* ---- Idle float (on wrapper) ---- */
+  @keyframes doge-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  .doge-float { animation: doge-float 3s ease-in-out infinite; }
+
+  /* ---- Entrance animations (on img inside wrapper) ---- */
+  @keyframes entrance-bounce {
+    0% { transform: translateY(-30px) scale(0.8); opacity: 0; }
+    50% { transform: translateY(6px) scale(1.05); opacity: 1; }
+    70% { transform: translateY(-3px) scale(0.98); }
+    100% { transform: translateY(0) scale(1); }
+  }
+  @keyframes entrance-peek {
+    0% { transform: translateY(20px) scale(0.9); opacity: 0; }
+    60% { transform: translateY(-4px) scale(1.03); opacity: 1; }
+    100% { transform: translateY(0) scale(1); }
+  }
+  @keyframes entrance-slide {
+    0% { transform: translateX(40px) rotate(8deg); opacity: 0; }
+    60% { transform: translateX(-4px) rotate(-2deg); opacity: 1; }
+    100% { transform: translateX(0) rotate(0deg); }
+  }
+  @keyframes entrance-dramatic {
+    0% { transform: scale(0.6); opacity: 0; }
+    40% { opacity: 1; }
+    70% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  @keyframes entrance-flop {
+    0% { transform: translateY(-50px) scaleY(1); opacity: 0; }
+    50% { transform: translateY(0) scaleY(0.85) scaleX(1.1); opacity: 1; }
+    70% { transform: translateY(-4px) scaleY(1.05) scaleX(0.97); }
+    100% { transform: translateY(0) scaleY(1) scaleX(1); }
+  }
+  @keyframes entrance-wiggle {
+    0% { transform: translateX(-20px) rotate(-10deg); opacity: 0; }
+    40% { transform: translateX(4px) rotate(4deg); opacity: 1; }
+    60% { transform: translateX(-2px) rotate(-2deg); }
+    80% { transform: translateX(1px) rotate(1deg); }
+    100% { transform: translateX(0) rotate(0deg); }
   }
 
-  .center-overlay .subtitle {
-    font-size: 13px;
-    color: var(--gray);
-    margin-top: 5px;
-  }
+  .enter-bounce { animation: entrance-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .enter-peek { animation: entrance-peek 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .enter-slide { animation: entrance-slide 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .enter-dramatic { animation: entrance-dramatic 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .enter-flop { animation: entrance-flop 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) both; }
+  .enter-wiggle { animation: entrance-wiggle 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-  .center-overlay .countdown {
-    font-size: 36px;
-    font-weight: 300;
-    color: var(--orange);
-    margin-top: 10px;
-    font-variant-numeric: tabular-nums;
+  /* ---- Button glow pulse ---- */
+  @keyframes btn-glow-pink {
+    0%, 100% { box-shadow: 0 3px 8px rgba(232, 54, 143, 0.30); }
+    50% { box-shadow: 0 3px 16px rgba(232, 54, 143, 0.50); }
   }
-
-  .center-overlay .buttons {
-    margin-top: 18px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 7px;
-  }
-
-  .center-overlay .buttons .row {
-    gap: 12px;
-    margin-bottom: 0;
+  @keyframes btn-glow-cyan {
+    0%, 100% { box-shadow: 0 3px 8px rgba(20, 184, 166, 0.30); }
+    50% { box-shadow: 0 3px 16px rgba(20, 184, 166, 0.50); }
   }
 
   .pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 24px;
-    border-radius: 999px;
-    font-size: 14px;
-    font-weight: 600;
-    color: white;
-    border: none;
-    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; border-radius: 999px; font-size: 14px; font-weight: 600;
+    color: white; border: none; cursor: pointer;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
-
   .pill:hover { transform: scale(1.04); }
+  .pill.pink { background: var(--pink); animation: btn-glow-pink 2.5s ease-in-out infinite; }
+  .pill.cyan { background: var(--cyan); animation: btn-glow-cyan 2.5s ease-in-out infinite; }
+  .pill.compact { padding: 7px 16px; font-size: 12px; }
 
-  .pill.pink {
-    background: var(--pink);
-    box-shadow: 0 3px 8px rgba(232, 54, 143, 0.30);
-  }
+  .text-btn { background: none; border: none; font-size: 12px; font-weight: 500; color: var(--gray); cursor: pointer; }
+  .text-btn.disabled { opacity: 0.5; cursor: default; }
 
-  .pill.cyan {
-    background: var(--cyan);
-    box-shadow: 0 3px 8px rgba(20, 184, 166, 0.30);
+  /* ---- Countdown pulse ---- */
+  @keyframes countdown-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
   }
-
-  .pill.compact {
-    padding: 7px 16px;
-    font-size: 12px;
-  }
-
-  .text-btn {
-    background: none;
-    border: none;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--gray);
-    cursor: pointer;
-  }
-
-  .text-btn.disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
+  .countdown-animated { animation: countdown-pulse 2s ease-in-out infinite; }
 
   /* ---- Top compact overlay ---- */
   .top-overlay {
-    width: 320px;
+    width: 340px;
     border-radius: 16px;
     background: var(--paper);
-    border: 1px solid rgba(0,0,0,0.08);
-    box-shadow: 0 12px 30px rgba(16,15,15,0.08);
+    border: 2px solid var(--cyan);
+    box-shadow: 0 12px 30px rgba(16,15,15,0.08), 0 0 0 1px rgba(20, 184, 166, 0.15);
     display: flex;
     align-items: flex-start;
     padding: 14px 14px 14px 16px;
     gap: 14px;
     overflow: hidden;
   }
-
-  .top-overlay .doge {
-    width: 72px;
-    height: 72px;
-    object-fit: contain;
-    flex-shrink: 0;
-  }
-
-  .top-overlay .content {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-  }
-
-  .top-overlay .message {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--ink);
-    line-height: 1.3;
-  }
-
-  .top-overlay .subtitle {
-    font-size: 11px;
-    color: var(--gray);
-  }
-
-  .top-overlay .action-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 4px;
-  }
-
-  .top-overlay .countdown {
-    font-size: 24px;
-    font-weight: 300;
-    color: var(--orange);
-    font-variant-numeric: tabular-nums;
-  }
+  .top-overlay .doge-wrap { width: 72px; height: 72px; flex-shrink: 0; }
+  .top-overlay .doge { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .top-overlay .content { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .top-overlay .message { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .top-overlay .subtitle { font-size: 11px; color: var(--gray); }
+  .top-overlay .action-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .top-overlay .countdown { font-size: 24px; font-weight: 300; color: var(--orange); font-variant-numeric: tabular-nums; }
 
   /* ---- Toast ---- */
   .toast {
-    width: 300px;
-    border-radius: 14px;
-    background: var(--paper);
-    border: 1px solid rgba(0,0,0,0.08);
-    box-shadow: 0 8px 20px rgba(16,15,15,0.06);
-    display: flex;
-    align-items: center;
-    padding: 14px 18px;
-    gap: 14px;
+    width: 300px; border-radius: 14px; background: var(--paper);
+    border: 2px solid var(--cyan);
+    box-shadow: 0 8px 20px rgba(16,15,15,0.06), 0 0 0 1px rgba(20, 184, 166, 0.15);
+    display: flex; align-items: center; padding: 14px 18px; gap: 14px;
   }
+  .toast .doge { width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; }
+  .toast .content { display: flex; flex-direction: column; gap: 3px; }
+  .toast .message { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .toast .subtitle { font-size: 12px; color: var(--gray); }
 
-  .toast .doge {
-    width: 48px;
-    height: 48px;
-    object-fit: contain;
-    flex-shrink: 0;
-  }
+  /* ---- Dim backdrop ---- */
+  .scene { position: relative; display: inline-flex; }
+  .scene .dim { position: absolute; inset: -20px; background: rgba(0,0,0,0.4); border-radius: 24px; z-index: 0; }
+  .scene .dim.light { background: rgba(0,0,0,0.1); }
+  .scene > :not(.dim) { position: relative; z-index: 1; }
 
-  .toast .content {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+  /* ---- Replay button ---- */
+  .replay-btn {
+    background: none; border: 1px solid #444; color: #888; font-size: 10px;
+    padding: 3px 8px; border-radius: 4px; cursor: pointer; margin-left: 8px;
+    text-transform: none; letter-spacing: 0;
   }
-
-  .toast .message {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--ink);
-  }
-
-  .toast .subtitle {
-    font-size: 12px;
-    color: var(--gray);
-  }
-
-  /* ---- Dim backdrop for center overlays ---- */
-  .scene {
-    position: relative;
-    display: inline-flex;
-  }
-
-  .scene .dim {
-    position: absolute;
-    inset: -20px;
-    background: rgba(0,0,0,0.4);
-    border-radius: 24px;
-    z-index: 0;
-  }
-
-  .scene .dim.light {
-    background: rgba(0,0,0,0.1);
-  }
-
-  .scene > :not(.dim) {
-    position: relative;
-    z-index: 1;
-  }
+  .replay-btn:hover { color: #ccc; border-color: #666; }
 </style>
 </head>
 <body>
@@ -282,39 +219,39 @@
 <h1>TakeBreak UI mockup</h1>
 
 <!-- ============ BREAK ALERT: First time ============ -->
-<h2>Break alert (first time)</h2>
+<h2>Break alert (first time) <button class="replay-btn" onclick="replaySection(this)">replay</button></h2>
 <div class="row">
   <div>
-    <div class="label">happy-1-tea</div>
+    <div class="label">happy-1-tea &middot; bounce</div>
     <div class="scene">
       <div class="dim"></div>
-      <div class="center-overlay">
-        <img class="doge" src="Resources/images/doge-happy-1-tea-small.png" alt="">
-        <div class="message">You've been at it for an hour.<br>Nice focus! Ready for a break?</div>
+      <div class="center-overlay mood-happy">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-bounce" src="Resources/images/doge-happy-1-tea-small.png" alt="">
+        </div>
+        <div class="message">much focus! you've been at it<br>for an hour. break time?</div>
         <div class="subtitle">62 min of continuous work</div>
         <div class="buttons">
-          <div class="row">
-            <button class="pill pink">Take a break</button>
-          </div>
-          <button class="text-btn disabled">Snooze 10 min (3s)</button>
+          <div class="row"><button class="pill pink">Take a break</button></div>
+          <button class="text-btn disabled">snooze 10 min (3s)</button>
         </div>
       </div>
     </div>
   </div>
 
   <div>
-    <div class="label">happy-3-peek</div>
+    <div class="label">happy-3-peek &middot; peek</div>
     <div class="scene">
       <div class="dim"></div>
-      <div class="center-overlay">
-        <img class="doge" src="Resources/images/doge-happy-3-peek-small.png" alt="">
-        <div class="message">An hour already! Your eyes and brain would love a break.</div>
+      <div class="center-overlay mood-happy">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-peek" src="Resources/images/doge-happy-3-peek-small.png" alt="">
+        </div>
+        <div class="message">wow, an hour already! your eyes<br>and brain would love a break.</div>
         <div class="subtitle">60 min of continuous work</div>
         <div class="buttons">
-          <div class="row">
-            <button class="pill pink">Take a break</button>
-          </div>
-          <button class="text-btn disabled">Snooze 10 min (5s)</button>
+          <div class="row"><button class="pill pink">Take a break</button></div>
+          <button class="text-btn disabled">snooze 10 min (5s)</button>
         </div>
       </div>
     </div>
@@ -322,39 +259,39 @@
 </div>
 
 <!-- ============ BREAK ALERT: Snoozed ============ -->
-<h2>Break alert (snoozed 1-2x)</h2>
+<h2>Break alert (snoozed 1-2x) <button class="replay-btn" onclick="replaySection(this)">replay</button></h2>
 <div class="row">
   <div>
-    <div class="label">nudge-2-sign</div>
+    <div class="label">nudge-2-sign &middot; slide</div>
     <div class="scene">
       <div class="dim"></div>
-      <div class="center-overlay">
-        <img class="doge" src="Resources/images/doge-nudge-2-sign-small.png" alt="">
-        <div class="message">That's another snooze. Your future self would appreciate a stretch.</div>
-        <div class="subtitle">Snoozed 2 times &middot; 78 min active</div>
+      <div class="center-overlay mood-nudge">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-slide" src="Resources/images/doge-nudge-2-sign-small.png" alt="">
+        </div>
+        <div class="message">such snooze. your future self<br>would appreciate a stretch.</div>
+        <div class="subtitle">snoozed 2 times &middot; 78 min active</div>
         <div class="buttons">
-          <div class="row">
-            <button class="pill pink">Take a break</button>
-          </div>
-          <button class="text-btn">Snooze 5 min</button>
+          <div class="row"><button class="pill pink">Take a break</button></div>
+          <button class="text-btn">snooze 5 min</button>
         </div>
       </div>
     </div>
   </div>
 
   <div>
-    <div class="label">nudge-1-watch</div>
+    <div class="label">nudge-1-watch &middot; slide</div>
     <div class="scene">
       <div class="dim"></div>
-      <div class="center-overlay">
-        <img class="doge" src="Resources/images/doge-nudge-1-watch-small.png" alt="">
-        <div class="message">Still going? Just checking in&mdash;break whenever you're ready.</div>
-        <div class="subtitle">Snoozed 1 time &middot; 70 min active</div>
+      <div class="center-overlay mood-nudge">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-slide" src="Resources/images/doge-nudge-1-watch-small.png" alt="">
+        </div>
+        <div class="message">still going? very determined.<br>break whenever you're ready, fren.</div>
+        <div class="subtitle">snoozed 1 time &middot; 70 min active</div>
         <div class="buttons">
-          <div class="row">
-            <button class="pill pink">Take a break</button>
-          </div>
-          <button class="text-btn">Snooze 5 min</button>
+          <div class="row"><button class="pill pink">Take a break</button></div>
+          <button class="text-btn">snooze 5 min</button>
         </div>
       </div>
     </div>
@@ -362,39 +299,39 @@
 </div>
 
 <!-- ============ BREAK ALERT: Very snoozed ============ -->
-<h2>Break alert (snoozed 3+)</h2>
+<h2>Break alert (snoozed 3+) <button class="replay-btn" onclick="replaySection(this)">replay</button></h2>
 <div class="row">
   <div>
-    <div class="label">sassy-1-crossed</div>
+    <div class="label">sassy-1-crossed &middot; dramatic</div>
     <div class="scene">
       <div class="dim"></div>
-      <div class="center-overlay">
-        <img class="doge" src="Resources/images/doge-sassy-1-crossed-small.png" alt="">
-        <div class="message">You're very committed. A five-minute break won't undo that.</div>
-        <div class="subtitle">Snoozed 4 times &middot; 96 min active</div>
+      <div class="center-overlay mood-sassy">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-dramatic" src="Resources/images/doge-sassy-1-crossed-small.png" alt="">
+        </div>
+        <div class="message">very committed. wow.<br>five minutes won't undo that.</div>
+        <div class="subtitle">snoozed 4 times &middot; 96 min active</div>
         <div class="buttons">
-          <div class="row">
-            <button class="pill pink">Take a break</button>
-          </div>
-          <button class="text-btn">Snooze 5 min</button>
+          <div class="row"><button class="pill pink">Take a break</button></div>
+          <button class="text-btn">snooze 5 min</button>
         </div>
       </div>
     </div>
   </div>
 
   <div>
-    <div class="label">sassy-2-facepalm</div>
+    <div class="label">sassy-2-facepalm &middot; dramatic</div>
     <div class="scene">
       <div class="dim"></div>
-      <div class="center-overlay">
-        <img class="doge" src="Resources/images/doge-sassy-2-facepalm-small.png" alt="">
-        <div class="message">At this point, taking a break would be the rebellious thing to do.</div>
-        <div class="subtitle">Snoozed 5 times &middot; 102 min active</div>
+      <div class="center-overlay mood-sassy">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-dramatic" src="Resources/images/doge-sassy-2-facepalm-small.png" alt="">
+        </div>
+        <div class="message">many snooze. such stubborn.<br>your chair is starting to worry.</div>
+        <div class="subtitle">snoozed 5 times &middot; 102 min active</div>
         <div class="buttons">
-          <div class="row">
-            <button class="pill pink">Take a break</button>
-          </div>
-          <button class="text-btn">Snooze 5 min</button>
+          <div class="row"><button class="pill pink">Take a break</button></div>
+          <button class="text-btn">snooze 5 min</button>
         </div>
       </div>
     </div>
@@ -405,40 +342,41 @@
 <h2>Grace countdown</h2>
 <div class="row">
   <div>
-    <div class="label">stretch-1-bow</div>
+    <div class="label">stretch-1-bow &middot; wiggle</div>
     <div class="scene">
       <div class="dim light"></div>
       <div class="top-overlay">
-        <img class="doge" src="Resources/images/doge-stretch-1-bow-small.png" alt="">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-wiggle" src="Resources/images/doge-stretch-1-bow-small.png" alt="">
+        </div>
         <div class="content">
-          <div class="message">Wrapping up...</div>
-          <div class="subtitle">Lock your screen when you're ready</div>
+          <div class="message">wrapping up...</div>
+          <div class="subtitle">lock your screen when you're ready</div>
           <div class="action-row">
-            <span class="countdown">1:57</span>
+            <span class="countdown countdown-animated">1:57</span>
             <button class="pill cyan compact">Lock now</button>
           </div>
         </div>
       </div>
     </div>
   </div>
-
 </div>
 
 <!-- ============ NAG ============ -->
-<h2>Nag (grace expired)</h2>
+<h2>Nag (grace expired) <button class="replay-btn" onclick="replaySection(this)">replay</button></h2>
 <div class="row">
   <div>
-    <div class="label">sassy-3-flopped</div>
+    <div class="label">sassy-3-flopped &middot; flop</div>
     <div class="scene">
       <div class="dim"></div>
-      <div class="center-overlay">
-        <img class="doge" src="Resources/images/doge-sassy-3-flopped-small.png" alt="">
-        <div class="message">Still here? You said you'd take a break.</div>
-        <div class="subtitle">Your break is waiting for you.</div>
+      <div class="center-overlay mood-nag">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-flop" src="Resources/images/doge-sassy-3-flopped-small.png" alt="">
+        </div>
+        <div class="message">still here? you said you'd<br>take a break. such betrayal.</div>
+        <div class="subtitle">your break is waiting for you.</div>
         <div class="buttons">
-          <div class="row">
-            <button class="pill cyan">Lock now</button>
-          </div>
+          <div class="row"><button class="pill cyan">Lock now</button></div>
           <button class="text-btn">5 more minutes</button>
         </div>
       </div>
@@ -446,17 +384,17 @@
   </div>
 
   <div>
-    <div class="label">sassy-1-crossed</div>
+    <div class="label">sassy-1-crossed &middot; dramatic</div>
     <div class="scene">
       <div class="dim"></div>
-      <div class="center-overlay">
-        <img class="doge" src="Resources/images/doge-sassy-1-crossed-small.png" alt="">
-        <div class="message">Still here? You said you'd take a break.</div>
-        <div class="subtitle">Your break is waiting for you.</div>
+      <div class="center-overlay mood-nag">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-dramatic" src="Resources/images/doge-sassy-1-crossed-small.png" alt="">
+        </div>
+        <div class="message">wow. much disappoint.<br>doge has been very patient.</div>
+        <div class="subtitle">your break is waiting for you.</div>
         <div class="buttons">
-          <div class="row">
-            <button class="pill cyan">Lock now</button>
-          </div>
+          <div class="row"><button class="pill cyan">Lock now</button></div>
           <button class="text-btn">5 more minutes</button>
         </div>
       </div>
@@ -465,19 +403,21 @@
 </div>
 
 <!-- ============ FIVE MORE MINUTES ============ -->
-<h2>Five more minutes (final extension)</h2>
+<h2>Five more minutes</h2>
 <div class="row">
   <div>
-    <div class="label">stretch-1-bow</div>
+    <div class="label">stretch-1-bow &middot; wiggle</div>
     <div class="scene">
       <div class="dim light"></div>
       <div class="top-overlay">
-        <img class="doge" src="Resources/images/doge-stretch-1-bow-small.png" alt="">
+        <div class="doge-wrap doge-float">
+          <img class="doge enter-wiggle" src="Resources/images/doge-stretch-1-bow-small.png" alt="">
+        </div>
         <div class="content">
-          <div class="message">Five more minutes...</div>
-          <div class="subtitle">Then it's really break time</div>
+          <div class="message">five more minutes...</div>
+          <div class="subtitle">then it's really break time, fren</div>
           <div class="action-row">
-            <span class="countdown">4:32</span>
+            <span class="countdown countdown-animated">4:32</span>
             <button class="pill cyan compact">Lock now</button>
           </div>
         </div>
@@ -492,10 +432,10 @@
   <div>
     <div class="label">focused-1-headband (25 min)</div>
     <div class="toast">
-      <img class="doge" src="Resources/images/doge-focused-1-headband-small.png" alt="">
+      <img class="doge enter-bounce" src="Resources/images/doge-focused-1-headband-small.png" alt="">
       <div class="content">
         <div class="message">25 min timer started</div>
-        <div class="subtitle">Let's do this!</div>
+        <div class="subtitle">such focus. very productive. wow.</div>
       </div>
     </div>
   </div>
@@ -503,14 +443,30 @@
   <div>
     <div class="label">focused-2-flex (45 min)</div>
     <div class="toast">
-      <img class="doge" src="Resources/images/doge-focused-2-flex-small.png" alt="">
+      <img class="doge enter-bounce" src="Resources/images/doge-focused-2-flex-small.png" alt="">
       <div class="content">
         <div class="message">45 min timer started</div>
-        <div class="subtitle">Deep work time.</div>
+        <div class="subtitle">much ambition. let's go.</div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+function replaySection(btn) {
+  const h2 = btn.closest('h2');
+  const row = h2.nextElementSibling;
+  const doges = row.querySelectorAll('img.doge');
+  doges.forEach(d => {
+    const enterClass = [...d.classList].find(c => c.startsWith('enter-'));
+    if (enterClass) {
+      d.style.animation = 'none';
+      d.offsetHeight; // force reflow
+      d.style.animation = '';
+    }
+  });
+}
+</script>
 
 </body>
 </html>
