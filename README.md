@@ -2,6 +2,10 @@
 
 A menu bar break reminder for macOS. Nudges you to take a break after an hour of continuous work, with escalating persistence if you keep snoozing.
 
+<p align="center">
+  <img src="Resources/screenshot-readme.png" width="430" alt="TakeBreak break reminder dialog">
+</p>
+
 ## Features
 
 - **Hourly reminders** — after 60 minutes of screen time, a friendly doge appears suggesting a break
