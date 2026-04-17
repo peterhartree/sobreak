@@ -60,47 +60,62 @@ struct Palette {
 
 struct Messages {
     static let firstAlert = [
-        "You've been at it for an hour. Nice focus! Ready for a break?",
-        "One hour of solid work—time to step away for a bit?",
-        "An hour already! Your eyes and brain would love a break.",
-        "You've been going strong for an hour. Break time?",
-        "Sixty minutes of focus. How about a change of scenery?",
+        "much focus! you've been at it for an hour. break time?",
+        "wow, an hour already! your eyes and brain would love a break.",
+        "one hour of solid work. very impressive. time to step away?",
+        "such dedication! sixty minutes of focus. how about a break?",
+        "you've been going strong for an hour. much work. break time?",
     ]
 
     static let snoozeEscalation = [
-        "Still going? Just checking in—break whenever you're ready.",
-        "That's another snooze. Your future self would appreciate a stretch.",
-        "Quite the streak! But seriously, a short break works wonders.",
-        "Three snoozes deep. Your chair is starting to worry about you.",
-        "You're very committed. A five-minute break won't undo that.",
-        "At this point, taking a break would be the rebellious thing to do.",
+        "still going? very determined. break whenever you're ready, fren.",
+        "such snooze. your future self would appreciate a stretch.",
+        "quite the streak! but seriously, a short break works wonders.",
+        "many snooze. such stubborn. your chair is starting to worry.",
+        "very committed. wow. five minutes won't undo that.",
+        "doge has asked nicely five times now. please take break.",
     ]
 
-    static let graceCountdown = "Wrapping up..."
-    static let nagMessage = "Still here? You said you'd take a break."
-    static let nagSubtle = "Your break is waiting for you."
+    static let graceCountdown = "wrapping up..."
+    static let nagMessage = [
+        "still here? you said you'd take a break. such betrayal.",
+        "wow. much disappoint. doge has been very patient.",
+    ]
+    static let nagSubtle = "your break is waiting for you."
+
+    static let fiveMoreMinutesMessage = "five more minutes..."
+    static let fiveMoreMinutesSubtitle = "then it's really break time, fren"
 
     static let pomodoroStarted = [
-        "Let's do this!",
-        "Focus mode: activated.",
-        "You've got this.",
-        "Deep work time.",
-        "Time to make things happen.",
-        "Locked in.",
-        "Here we go!",
-        "The clock is ticking.",
-        "Go time.",
-        "Make it count.",
+        "such focus. very productive. wow.",
+        "much ambition. let's go.",
+        "focus mode: activated. wow.",
+        "deep work time. very serious.",
+        "locked in. such determination.",
+        "go time. much energy.",
     ]
 }
 
 // MARK: - Doge Images
 
 enum DogeImage: String, CaseIterable {
-    case happy = "doge-happy"
-    case nudge = "doge-nudge"
-    case sassy = "doge-sassy"
-    case stretch = "doge-stretch"
+    // Happy (snoozeCount=0)
+    case happy1Tea = "doge-happy-1-tea"
+    case happy2Wave = "doge-happy-2-wave"
+    case happy3Peek = "doge-happy-3-peek"
+    // Nudge (snoozeCount 1-2)
+    case nudge1Watch = "doge-nudge-1-watch"
+    case nudge2Sign = "doge-nudge-2-sign"
+    case nudge3Poke = "doge-nudge-3-poke"
+    // Sassy (snoozeCount 3+)
+    case sassy1Crossed = "doge-sassy-1-crossed"
+    case sassy2Facepalm = "doge-sassy-2-facepalm"
+    case sassy3Flopped = "doge-sassy-3-flopped"
+    // Stretch (grace countdown)
+    case stretch1Bow = "doge-stretch-1-bow"
+    // Focused (pomodoro toast)
+    case focused1Headband = "doge-focused-1-headband"
+    case focused2Flex = "doge-focused-2-flex"
 
     /// Load the small (256px) transparent version for UI display.
     /// Fallback chain: small → transparent → original.
@@ -121,15 +136,43 @@ enum DogeImage: String, CaseIterable {
         return nil
     }
 
-    /// Pick the right doge for the current situation
-    static func forAlert(snoozeCount: Int) -> DogeImage {
-        if snoozeCount == 0 { return .happy }
-        if snoozeCount <= 2 { return .nudge }
-        return .sassy
+    /// The entrance animation style for this doge image
+    enum EntranceAnimation {
+        case bounce    // happy
+        case slide     // nudge
+        case dramatic  // sassy/nag
+        case wiggle    // stretch
     }
 
-    static var forGrace: DogeImage { .stretch }
-    static var forNag: DogeImage { .sassy }
+    var entranceAnimation: EntranceAnimation {
+        switch self {
+        case .happy1Tea, .happy2Wave, .happy3Peek, .focused1Headband, .focused2Flex:
+            return .bounce
+        case .nudge1Watch, .nudge2Sign, .nudge3Poke:
+            return .slide
+        case .sassy1Crossed, .sassy2Facepalm, .sassy3Flopped:
+            return .dramatic
+        case .stretch1Bow:
+            return .wiggle
+        }
+    }
+
+    static let happyImages: [DogeImage] = [.happy1Tea, .happy2Wave, .happy3Peek]
+    static let nudgeImages: [DogeImage] = [.nudge1Watch, .nudge2Sign, .nudge3Poke]
+    static let sassyImages: [DogeImage] = [.sassy1Crossed, .sassy2Facepalm, .sassy3Flopped]
+    static let focusedImages: [DogeImage] = [.focused1Headband, .focused2Flex]
+    static let nagImages: [DogeImage] = [.sassy3Flopped, .sassy1Crossed]
+
+    /// Pick the right doge for the current situation
+    static func forAlert(snoozeCount: Int) -> DogeImage {
+        if snoozeCount == 0 { return happyImages.randomElement()! }
+        if snoozeCount <= 2 { return nudgeImages.randomElement()! }
+        return sassyImages.randomElement()!
+    }
+
+    static var forGrace: DogeImage { .stretch1Bow }
+    static var forNag: DogeImage { nagImages.randomElement()! }
+    static var forFocused: DogeImage { focusedImages.randomElement()! }
 }
 
 // MARK: - App State
@@ -200,8 +243,8 @@ class MediaDetector {
 
 class OverlayWindowController: NSObject, ObservableObject {
     private enum Metrics {
-        static let centerSize = NSSize(width: 420, height: 420)
-        static let topSize = NSSize(width: 340, height: 130)
+        static let centerSize = NSSize(width: 400, height: 450)
+        static let topSize = NSSize(width: 340, height: 110)
         static let topShadowCompensation: CGFloat = 0
     }
 
@@ -217,6 +260,9 @@ class OverlayWindowController: NSObject, ObservableObject {
     @Published var countdownText: String = ""
     @Published var showCountdown: Bool = false
     @Published var dogeImage: NSImage?
+    @Published var dogeImageEnum: DogeImage = .happy1Tea
+    @Published var borderColor: Color = Palette.suiYellow
+    @Published var backgroundTint: Color = Palette.suiPaper
     @Published var isCompact: Bool = false
     @Published var snoozeLabel: String = "Snooze 10 min"
     @Published var isSnoozeEnabled: Bool = true
@@ -369,37 +415,84 @@ class OverlayWindowController: NSObject, ObservableObject {
     }
 }
 
-// MARK: - Rainbow Bar
+// MARK: - Doge Entrance Animation View
 
-struct RainbowBar: View {
-    @State private var offset: CGFloat = 0
+struct DogeEntranceView: View {
+    let image: NSImage
+    let animation: DogeImage.EntranceAnimation
+    let size: CGFloat
 
-    let colors: [Color] = [
-        Color(red: 0.910, green: 0.271, blue: 0.235),  // red
-        Color(red: 0.910, green: 0.459, blue: 0.039),  // orange
-        Color(red: 0.941, green: 0.769, blue: 0.188),  // yellow
-        Color(red: 0.216, green: 0.780, blue: 0.349),  // green
-        Color(red: 0.078, green: 0.722, blue: 0.651),  // cyan
-        Color(red: 0.322, green: 0.506, blue: 0.863),  // blue
-        Color(red: 0.608, green: 0.427, blue: 0.843),  // purple
-        Color(red: 0.910, green: 0.212, blue: 0.561),  // pink
-        Color(red: 0.910, green: 0.271, blue: 0.235),  // red (loop)
-    ]
+    @State private var entered = false
+    @State private var floatOffset: CGFloat = 0
 
     var body: some View {
-        GeometryReader { geo in
-            LinearGradient(
-                colors: colors,
-                startPoint: UnitPoint(x: offset, y: 0.5),
-                endPoint: UnitPoint(x: offset + 1, y: 0.5)
-            )
-            .frame(height: 7)
+        // Outer wrapper: idle float
+        ZStack {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size)
+                .modifier(EntranceModifier(animation: animation, entered: entered))
         }
-        .frame(height: 7)
+        .offset(y: floatOffset)
         .onAppear {
-            withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
-                offset = -1
+            // Trigger entrance
+            withAnimation(entranceSpring) {
+                entered = true
             }
+            // Start idle float after entrance completes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
+                    floatOffset = -4
+                }
+            }
+        }
+        .onDisappear {
+            entered = false
+            floatOffset = 0
+        }
+    }
+
+    private var entranceSpring: Animation {
+        switch animation {
+        case .bounce:
+            return .spring(response: 0.5, dampingFraction: 0.6)
+        case .slide:
+            return .spring(response: 0.5, dampingFraction: 0.7)
+        case .dramatic:
+            return .spring(response: 0.7, dampingFraction: 0.65)
+        case .wiggle:
+            return .spring(response: 0.5, dampingFraction: 0.6)
+        }
+    }
+}
+
+struct EntranceModifier: ViewModifier {
+    let animation: DogeImage.EntranceAnimation
+    let entered: Bool
+
+    func body(content: Content) -> some View {
+        switch animation {
+        case .bounce:
+            content
+                .offset(y: entered ? 0 : -30)
+                .scaleEffect(entered ? 1.0 : 0.8)
+                .opacity(entered ? 1 : 0)
+        case .slide:
+            content
+                .offset(x: entered ? 0 : 40)
+                .rotationEffect(.degrees(entered ? 0 : 8))
+                .opacity(entered ? 1 : 0)
+        case .dramatic:
+            content
+                .scaleEffect(entered ? 1.0 : 0.6)
+                .opacity(entered ? 1 : 0)
+        case .wiggle:
+            content
+                .offset(x: entered ? 0 : -20)
+                .rotationEffect(.degrees(entered ? 0 : -10))
+                .opacity(entered ? 1 : 0)
         }
     }
 }
@@ -414,6 +507,7 @@ struct OverlayView: View {
 
     @ObservedObject var controller: OverlayWindowController
     let layout: Layout
+    @State private var appeared = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -423,9 +517,19 @@ struct OverlayView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                .stroke(controller.borderColor, lineWidth: 2)
         )
         .shadow(color: Palette.suiInk.opacity(0.08), radius: 30, y: 12)
+        .scaleEffect(appeared ? 1.0 : 0.92)
+        .opacity(appeared ? 1.0 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                appeared = true
+            }
+        }
+        .onDisappear {
+            appeared = false
+        }
     }
 
     @ViewBuilder
@@ -441,76 +545,71 @@ struct OverlayView: View {
 
     // Two-column compact layout: doge on left, text+buttons on right
     private var compactContent: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             if let img = controller.dogeImage {
-                ZStack {
-                    Circle().fill(Color.white).frame(width: 82, height: 82)
-                    Image(nsImage: img)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 70, height: 70)
-                        .clipShape(Circle())
-                }
-                .shadow(color: Palette.suiInk.opacity(0.06), radius: 6, y: 3)
+                DogeEntranceView(
+                    image: img,
+                    animation: controller.dogeImageEnum.entranceAnimation,
+                    size: 72
+                )
+                .shadow(color: Palette.suiInk.opacity(0.08), radius: 4, y: 2)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(controller.message)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundColor(Palette.suiInk)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if !controller.subtitle.isEmpty {
                     Text(controller.subtitle)
-                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .font(.system(size: 11, weight: .regular, design: .rounded))
                         .foregroundColor(Palette.suiGray)
                 }
 
                 HStack(spacing: 10) {
                     if controller.showCountdown {
                         Text(controller.countdownText)
-                            .font(.system(size: 28, weight: .light, design: .rounded))
+                            .font(.system(size: 24, weight: .light, design: .rounded))
                             .monospacedDigit()
                             .foregroundColor(Palette.suiOrange)
                     }
 
-                    actionButtons
+                    compactActionButtons
                 }
             }
         }
-        .padding(.leading, 20)
-        .padding(.trailing, 16)
-        .padding(.vertical, 14)
+        .padding(.leading, 16)
+        .padding(.trailing, 14)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Palette.suiPaper)
     }
 
     // Full centered layout for break alerts and nag
     private var fullContent: some View {
-        VStack(spacing: 20) {
-            Spacer().frame(height: 12)
+        VStack(spacing: 0) {
+            Spacer().frame(height: 24)
 
             if let img = controller.dogeImage {
-                ZStack {
-                    Circle().fill(Color.white).frame(width: 130, height: 130)
-                    Image(nsImage: img)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 112, height: 112)
-                        .clipShape(Circle())
-                }
-                .shadow(color: Palette.suiInk.opacity(0.06), radius: 8, y: 3)
+                DogeEntranceView(
+                    image: img,
+                    animation: controller.dogeImageEnum.entranceAnimation,
+                    size: 180
+                )
             }
 
+            Spacer().frame(height: 14)
+
             Text(controller.message)
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(.system(size: 21, weight: .semibold, design: .rounded))
                 .foregroundColor(Palette.suiInk)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 28)
+
+            Spacer().frame(height: 5)
 
             if !controller.subtitle.isEmpty {
                 Text(controller.subtitle)
@@ -519,22 +618,23 @@ struct OverlayView: View {
             }
 
             if controller.showCountdown {
+                Spacer().frame(height: 12)
                 Text(controller.countdownText)
-                    .font(.system(size: 40, weight: .light, design: .rounded))
+                    .font(.system(size: 36, weight: .light, design: .rounded))
                     .monospacedDigit()
                     .foregroundColor(Palette.suiOrange)
             }
 
-            Spacer().frame(height: 4)
+            Spacer()
 
             actionButtons
 
-            Spacer().frame(height: 16)
+            Spacer().frame(height: 22)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .background(
             RadialGradient(
-                colors: [Palette.suiPaper, Palette.suiPaperDark],
+                colors: [controller.backgroundTint, Palette.suiPaperDark],
                 center: .center,
                 startRadius: 20,
                 endRadius: 300
@@ -542,15 +642,14 @@ struct OverlayView: View {
         )
     }
 
-    // Shared buttons
+    // Full-size buttons for center layout
     private var actionButtons: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 14) {
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
                 if controller.showTakeBreak {
                     PillButton(
                         title: "Take a break",
-                        gradient: [Palette.suiPink, Color(red: 0.88, green: 0.30, blue: 0.48)],
-                        shadow: Palette.suiPink,
+                        color: Palette.suiPink,
                         action: { controller.onTakeBreak?() }
                     )
                 }
@@ -558,8 +657,7 @@ struct OverlayView: View {
                 if controller.showLockNow {
                     PillButton(
                         title: "Lock now",
-                        gradient: [Palette.suiCyan, Color(red: 0.06, green: 0.62, blue: 0.58)],
-                        shadow: Palette.suiCyan,
+                        color: Palette.suiCyan,
                         action: { controller.onLockNow?() }
                     )
                 }
@@ -568,7 +666,7 @@ struct OverlayView: View {
             if controller.showSnooze {
                 Button(action: { controller.onSnooze?() }) {
                     Text(controller.snoozeLabel)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(Palette.suiGray)
                 }
                 .buttonStyle(.plain)
@@ -579,7 +677,30 @@ struct OverlayView: View {
             if controller.showFiveMore {
                 Button(action: { controller.onFiveMore?() }) {
                     Text("5 more minutes")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(Palette.suiGray)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // Compact buttons for top layout
+    private var compactActionButtons: some View {
+        HStack(spacing: 8) {
+            if controller.showLockNow {
+                PillButton(
+                    title: "Lock now",
+                    color: Palette.suiCyan,
+                    size: .compact,
+                    action: { controller.onLockNow?() }
+                )
+            }
+
+            if controller.showFiveMore {
+                Button(action: { controller.onFiveMore?() }) {
+                    Text("5 more min")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundColor(Palette.suiGray)
                 }
                 .buttonStyle(.plain)
@@ -591,31 +712,45 @@ struct OverlayView: View {
 // MARK: - Pill Button
 
 struct PillButton: View {
+    enum Size {
+        case regular
+        case compact
+    }
+
     let title: String
-    let gradient: [Color]
-    let shadow: Color
+    let color: Color
+    var size: Size = .regular
     let action: () -> Void
 
     @State private var isHovered = false
+    @State private var glowPulse = false
+
+    private var fontSize: CGFloat { size == .compact ? 12 : 14 }
+    private var hPad: CGFloat { size == .compact ? 16 : 24 }
+    private var vPad: CGFloat { size == .compact ? 7 : 10 }
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .padding(.horizontal, 26)
-                .padding(.vertical, 11)
+                .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+                .padding(.horizontal, hPad)
+                .padding(.vertical, vPad)
                 .background(
-                    Capsule()
-                        .fill(LinearGradient(colors: gradient, startPoint: .top, endPoint: .bottom))
+                    Capsule().fill(color)
                 )
                 .foregroundColor(.white)
-                .shadow(color: shadow.opacity(0.35), radius: 6, y: 3)
+                .shadow(color: color.opacity(glowPulse ? 0.50 : 0.25), radius: glowPulse ? 16 : 8, y: 2)
         }
         .buttonStyle(.plain)
         .scaleEffect(isHovered ? 1.04 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                glowPulse = true
+            }
         }
     }
 }
@@ -939,7 +1074,22 @@ class TakeBreakController: NSObject {
 
         let elapsed = workStartTime.map { Int(Date().timeIntervalSince($0)) / 60 } ?? 0
 
-        overlayController.dogeImage = DogeImage.forAlert(snoozeCount: snoozeCount).nsImage
+        let dogeEnum = DogeImage.forAlert(snoozeCount: snoozeCount)
+        overlayController.dogeImageEnum = dogeEnum
+        overlayController.dogeImage = dogeEnum.nsImage
+
+        // Mood-coloured border and background tint
+        if snoozeCount == 0 {
+            overlayController.borderColor = Palette.suiYellow
+            overlayController.backgroundTint = Color(red: 1.0, green: 0.976, blue: 0.890) // #FFF9E3
+        } else if snoozeCount <= 2 {
+            overlayController.borderColor = Palette.suiOrange
+            overlayController.backgroundTint = Color(red: 1.0, green: 0.965, blue: 0.863) // warmer
+        } else {
+            overlayController.borderColor = Palette.suiPink
+            overlayController.backgroundTint = Color(red: 1.0, green: 0.950, blue: 0.878) // warmest
+        }
+
         overlayController.message = message
         overlayController.subtitle = snoozeCount > 0 ? "Snoozed \(snoozeCount) time\(snoozeCount == 1 ? "" : "s") · \(elapsed) min active" : "\(elapsed) min of continuous work"
         let nextSnoozeMins = snoozeCount == 0 ? Int(Config.snoozeDuration / 60) : Int(Config.shortSnoozeDuration / 60)
@@ -1007,9 +1157,13 @@ class TakeBreakController: NSObject {
         graceDuration = Config.gracePeriod
         snoozeUnlockAt = nil
 
-        overlayController.dogeImage = DogeImage.forGrace.nsImage
+        let dogeEnum = DogeImage.forGrace
+        overlayController.dogeImageEnum = dogeEnum
+        overlayController.dogeImage = dogeEnum.nsImage
+        overlayController.borderColor = Palette.suiCyan
+        overlayController.backgroundTint = Palette.suiPaper
         overlayController.message = Messages.graceCountdown
-        overlayController.subtitle = "Lock your screen when you're ready"
+        overlayController.subtitle = "lock your screen when you're ready"
         overlayController.showSnooze = false
         overlayController.showTakeBreak = false
         overlayController.showLockNow = true
@@ -1031,8 +1185,12 @@ class TakeBreakController: NSObject {
         NSLog("[TakeBreak] Grace period expired — showing nag")
         phase = .nagging
 
-        overlayController.dogeImage = DogeImage.forNag.nsImage
-        overlayController.message = Messages.nagMessage
+        let dogeEnum = DogeImage.forNag
+        overlayController.dogeImageEnum = dogeEnum
+        overlayController.dogeImage = dogeEnum.nsImage
+        overlayController.borderColor = Palette.suiPink
+        overlayController.backgroundTint = Color(red: 1.0, green: 0.941, blue: 0.902) // warmest for nag
+        overlayController.message = Messages.nagMessage.randomElement()!
         overlayController.subtitle = Messages.nagSubtle
         overlayController.showSnooze = false
         overlayController.showTakeBreak = false
@@ -1054,9 +1212,13 @@ class TakeBreakController: NSObject {
         graceStartTime = Date()
         graceDuration = Config.finalExtension
 
-        overlayController.dogeImage = DogeImage.forGrace.nsImage
-        overlayController.message = "Five more minutes..."
-        overlayController.subtitle = "Then it's really break time"
+        let dogeEnum = DogeImage.forGrace
+        overlayController.dogeImageEnum = dogeEnum
+        overlayController.dogeImage = dogeEnum.nsImage
+        overlayController.borderColor = Palette.suiCyan
+        overlayController.backgroundTint = Palette.suiPaper
+        overlayController.message = Messages.fiveMoreMinutesMessage
+        overlayController.subtitle = Messages.fiveMoreMinutesSubtitle
         overlayController.showSnooze = false
         overlayController.showTakeBreak = false
         overlayController.showLockNow = true
@@ -1228,40 +1390,37 @@ class TakeBreakController: NSObject {
         confirmationWindow?.orderOut(nil)
 
         let motivation = Messages.pomodoroStarted.randomElement()!
-        let dogeImg = DogeImage.happy.nsImage
+        let dogeEnum = DogeImage.forFocused
+        let dogeImg = dogeEnum.nsImage
 
-        let toastView = HStack(spacing: 18) {
+        let toastView = HStack(spacing: 14) {
             if let img = dogeImg {
-                ZStack {
-                    Circle().fill(Color.white).frame(width: 72, height: 72)
-                    Image(nsImage: img)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 60, height: 60)
-                        .clipShape(Circle())
-                }
-                .shadow(color: Palette.suiInk.opacity(0.06), radius: 4, y: 2)
+                DogeEntranceView(
+                    image: img,
+                    animation: dogeEnum.entranceAnimation,
+                    size: 48
+                )
+                .shadow(color: Palette.suiInk.opacity(0.08), radius: 4, y: 2)
             }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(text)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundColor(Palette.suiInk)
                 Text(motivation)
-                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                    .font(.system(size: 12, weight: .regular, design: .rounded))
                     .foregroundColor(Palette.suiGray)
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
         .background(Palette.suiPaper)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Palette.suiCyan, lineWidth: 2)
         )
 
-        let size = NSSize(width: 340, height: 104)
+        let size = NSSize(width: 300, height: 88)
         let hostingView = NSHostingView(rootView: toastView.frame(width: size.width, height: size.height))
         hostingView.frame = NSRect(origin: .zero, size: size)
 
