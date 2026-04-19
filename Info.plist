@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>TakeBreak</string>
+    <string>SoBreak</string>
     <key>CFBundleDisplayName</key>
-    <string>Take Break</string>
+    <string>So Break</string>
     <key>CFBundleIdentifier</key>
-    <string>is.pjh.take-break</string>
+    <string>is.pjh.so-break</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>CFBundleShortVersionString</key>
@@ -15,7 +15,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
-    <string>TakeBreak</string>
+    <string>SoBreak</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>

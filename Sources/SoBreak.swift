@@ -193,7 +193,7 @@ class MediaDetector {
     /// which typically indicates video playback or a video call is active.
     static func isMediaActive() -> Bool {
         let (active, details) = checkAssertions()
-        NSLog("[TakeBreak] Media check: active=\(active)\(details.isEmpty ? "" : " — \(details)")")
+        NSLog("[SoBreak] Media check: active=\(active)\(details.isEmpty ? "" : " — \(details)")")
         return active
     }
 
@@ -757,7 +757,7 @@ struct PillButton: View {
 
 // MARK: - App Controller
 
-class TakeBreakController: NSObject {
+class SoBreakController: NSObject {
     private var statusItem: NSStatusItem!
     private var overlayController = OverlayWindowController()
     private var dimWindows: [NSWindow] = []
@@ -805,7 +805,7 @@ class TakeBreakController: NSObject {
         updateMenuBarDisplay()
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Take Break", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "So Break", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
 
         let statusItem = NSMenuItem(title: "Status: Starting...", action: nil, keyEquivalent: "")
@@ -929,14 +929,14 @@ class TakeBreakController: NSObject {
     }
 
     @objc private func screenDidUnlock() {
-        NSLog("[TakeBreak] Screen unlocked")
+        NSLog("[SoBreak] Screen unlocked")
         DispatchQueue.main.async { [weak self] in
             self?.startWorking()
         }
     }
 
     @objc private func screenDidLock() {
-        NSLog("[TakeBreak] Screen locked — resetting all state")
+        NSLog("[SoBreak] Screen locked — resetting all state")
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.cancelAllTimers()
@@ -1012,7 +1012,7 @@ class TakeBreakController: NSObject {
         overlayController.isSnoozeEnabled = true
         overlayController.showSnooze = true
         overlayController.snoozeLabel = snoozeReadyLabel
-        NSLog("[TakeBreak] Started working, timer from \(workStartTime!)")
+        NSLog("[SoBreak] Started working, timer from \(workStartTime!)")
         updateMenuBarDisplay()
     }
 
@@ -1041,7 +1041,7 @@ class TakeBreakController: NSObject {
             if elapsed >= effectiveWorkDuration {
                 if MediaDetector.isMediaActive() {
                     if phase != .alertPending {
-                        NSLog("[TakeBreak] Alert deferred — media/call active")
+                        NSLog("[SoBreak] Alert deferred — media/call active")
                     }
                     phase = .alertPending
                 } else {
@@ -1053,7 +1053,7 @@ class TakeBreakController: NSObject {
 
     private func checkAssertions() {
         if phase == .alertPending && !MediaDetector.isMediaActive() {
-            NSLog("[TakeBreak] Media no longer active — showing deferred alert")
+            NSLog("[SoBreak] Media no longer active — showing deferred alert")
             showBreakAlert()
         }
     }
@@ -1061,7 +1061,7 @@ class TakeBreakController: NSObject {
     // MARK: - Break Alert
 
     private func showBreakAlert() {
-        NSLog("[TakeBreak] Showing break alert (snoozeCount: \(snoozeCount))")
+        NSLog("[SoBreak] Showing break alert (snoozeCount: \(snoozeCount))")
         phase = .alertShown
 
         let message: String
@@ -1118,7 +1118,7 @@ class TakeBreakController: NSObject {
     private func snooze() {
         updateSnoozeButtonState()
         guard overlayController.isSnoozeEnabled else {
-            NSLog("[TakeBreak] Snooze click ignored — confirmation countdown still active")
+            NSLog("[SoBreak] Snooze click ignored — confirmation countdown still active")
             return
         }
 
@@ -1129,18 +1129,18 @@ class TakeBreakController: NSObject {
         snoozeUntil = Date().addingTimeInterval(duration)
         hideDim()
         overlayController.dismiss()
-        NSLog("[TakeBreak] Snoozed (count: \(snoozeCount), duration: \(Int(duration/60)) min), next alert after \(snoozeUntil!)")
+        NSLog("[SoBreak] Snoozed (count: \(snoozeCount), duration: \(Int(duration/60)) min), next alert after \(snoozeUntil!)")
 
         snoozeTimer?.invalidate()
         snoozeTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
             guard let self = self, self.phase == .working else { return }
             self.snoozeUntil = nil
-            NSLog("[TakeBreak] Snooze timer fired, checking media...")
+            NSLog("[SoBreak] Snooze timer fired, checking media...")
             if MediaDetector.isMediaActive() {
-                NSLog("[TakeBreak] Media active after snooze — deferring alert")
+                NSLog("[SoBreak] Media active after snooze — deferring alert")
                 self.phase = .alertPending
             } else {
-                NSLog("[TakeBreak] No media active — showing break alert")
+                NSLog("[SoBreak] No media active — showing break alert")
                 self.showBreakAlert()
             }
         }
@@ -1151,7 +1151,7 @@ class TakeBreakController: NSObject {
     // MARK: - Take a Break (Grace Period)
 
     private func takeBreak() {
-        NSLog("[TakeBreak] User chose 'Take a break' — starting grace countdown")
+        NSLog("[SoBreak] User chose 'Take a break' — starting grace countdown")
         phase = .graceCountdown
         graceStartTime = Date()
         graceDuration = Config.gracePeriod
@@ -1182,7 +1182,7 @@ class TakeBreakController: NSObject {
     // MARK: - Nag
 
     private func showNag() {
-        NSLog("[TakeBreak] Grace period expired — showing nag")
+        NSLog("[SoBreak] Grace period expired — showing nag")
         phase = .nagging
 
         let dogeEnum = DogeImage.forNag
@@ -1304,7 +1304,7 @@ class TakeBreakController: NSObject {
                               EventParamType(typeEventHotKeyID), nil,
                               MemoryLayout<EventHotKeyID>.size, nil, &hotkeyID)
 
-            let controller = Unmanaged<TakeBreakController>.fromOpaque(userData).takeUnretainedValue()
+            let controller = Unmanaged<SoBreakController>.fromOpaque(userData).takeUnretainedValue()
             DispatchQueue.main.async {
                 switch hotkeyID.id {
                 case 1: // Cmd+Option+T — start 25 min pomodoro
@@ -1333,7 +1333,7 @@ class TakeBreakController: NSObject {
         RegisterEventHotKey(UInt32(kVK_ANSI_D), modifiers, id2, GetApplicationEventTarget(), 0, &ref2)
         hotkeyRefs.append(ref2)
 
-        NSLog("[TakeBreak] Registered global hotkeys: Cmd+Option+T (pomodoro), Cmd+Option+D (debug preview)")
+        NSLog("[SoBreak] Registered global hotkeys: Cmd+Option+T (pomodoro), Cmd+Option+D (debug preview)")
     }
 
     // MARK: - Debug Preview (Cmd+Option+D)
@@ -1383,7 +1383,7 @@ class TakeBreakController: NSObject {
             stepName = "Unknown"
         }
 
-        NSLog("[TakeBreak] Debug preview step \(debugPreviewStep): \(stepName)")
+        NSLog("[SoBreak] Debug preview step \(debugPreviewStep): \(stepName)")
     }
 
     func showConfirmationToast(_ text: String) {
@@ -1472,7 +1472,7 @@ class TakeBreakController: NSObject {
         snoozeUntil = nil
         graceStartTime = nil
         snoozeUnlockAt = nil
-        NSLog("[TakeBreak] Started \(minutes) min pomodoro timer")
+        NSLog("[SoBreak] Started \(minutes) min pomodoro timer")
         updatePomodoroMenuItems()
         updateMenuBarDisplay()
     }
@@ -1488,7 +1488,7 @@ class TakeBreakController: NSObject {
         snoozeUntil = nil
         graceStartTime = nil
         snoozeUnlockAt = nil
-        NSLog("[TakeBreak] Cancelled pomodoro, back to default 60 min timer")
+        NSLog("[SoBreak] Cancelled pomodoro, back to default 60 min timer")
         updatePomodoroMenuItems()
         updateMenuBarDisplay()
     }
@@ -1513,7 +1513,7 @@ class TakeBreakController: NSObject {
 // MARK: - App Delegate
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    let controller = TakeBreakController()
+    let controller = SoBreakController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller.start()

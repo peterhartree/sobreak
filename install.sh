@@ -1,22 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
-# Guard: TakeBreak is for the MacBook Pro only. The mini is a headless
+# Guard: So Break is for the MacBook Pro only. The mini is a headless
 # agent host where break reminders serve no purpose.
 HOST="$(scutil --get LocalHostName 2>/dev/null || hostname -s)"
 if [ "$HOST" = "mini" ]; then
-    echo "Refusing to install on '$HOST'. TakeBreak is mbp-only." >&2
+    echo "Refusing to install on '$HOST'. So Break is mbp-only." >&2
     exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="TakeBreak"
+APP_NAME="SoBreak"
 BUILD_DIR="$SCRIPT_DIR/build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 INSTALL_DIR="$HOME/Applications"
 LAUNCH_AGENT_DIR="$HOME/Library/LaunchAgents"
-PLIST_NAME="is.pjh.take-break.plist"
-LABEL="is.pjh.take-break"
+PLIST_NAME="is.pjh.so-break.plist"
+LABEL="is.pjh.so-break"
 
 # Build release version
 echo "Building release..."
@@ -41,7 +41,7 @@ cat > "$LAUNCH_AGENT_DIR/$PLIST_NAME" << EOF
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>is.pjh.take-break</string>
+    <string>is.pjh.so-break</string>
     <key>ProgramArguments</key>
     <array>
         <string>$INSTALL_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME</string>
@@ -63,7 +63,7 @@ echo "Loading LaunchAgent..."
 launchctl bootstrap "gui/$(id -u)" "$LAUNCH_AGENT_DIR/$PLIST_NAME"
 
 echo ""
-echo "Done! Take Break is now running and will start automatically on login."
+echo "Done! So Break is now running and will start automatically on login."
 echo "  App: $INSTALL_DIR/$APP_NAME.app"
 echo "  Agent: $LAUNCH_AGENT_DIR/$PLIST_NAME"
 echo "  Logs: /tmp/break-reminder.log"

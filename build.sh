@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="TakeBreak"
+APP_NAME="SoBreak"
 BUILD_DIR="$SCRIPT_DIR/build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
@@ -33,7 +33,7 @@ swiftc \
     -framework SwiftUI \
     -framework IOKit \
     -o "$MACOS/$APP_NAME" \
-    "$SCRIPT_DIR/Sources/TakeBreak.swift"
+    "$SCRIPT_DIR/Sources/SoBreak.swift"
 
 # Copy Info.plist
 cp "$SCRIPT_DIR/Info.plist" "$CONTENTS/Info.plist"

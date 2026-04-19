@@ -181,7 +181,7 @@ func sourceFileContents() -> String {
     let projectDir = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let sourcePath = projectDir.appendingPathComponent("Sources/TakeBreak.swift")
+    let sourcePath = projectDir.appendingPathComponent("Sources/SoBreak.swift")
     return (try? String(contentsOf: sourcePath, encoding: .utf8)) ?? ""
 }
 
@@ -304,8 +304,8 @@ test("Source file exists") {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
     assertTrue(
-        FileManager.default.fileExists(atPath: projectDir.appendingPathComponent("Sources/TakeBreak.swift").path),
-        "TakeBreak.swift should exist"
+        FileManager.default.fileExists(atPath: projectDir.appendingPathComponent("Sources/SoBreak.swift").path),
+        "SoBreak.swift should exist"
     )
 }
 

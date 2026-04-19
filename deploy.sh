@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Deploy TakeBreak: build, tag, push to GitHub, create release, update homebrew tap.
+# Deploy So Break: build, tag, push to GitHub, create release, update homebrew tap.
 #
 # Usage:
 #   ./deploy.sh <version>    e.g. ./deploy.sh 1.1.0
@@ -14,10 +14,10 @@ set -euo pipefail
 #   5. Pushes the tap update
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="TakeBreak"
+APP_NAME="SoBreak"
 BUILD_DIR="$SCRIPT_DIR/build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
-TAP_REPO="peterhartree/homebrew-takebreak"
+TAP_REPO="peterhartree/homebrew-sobreak"
 
 # ---- Parse version ----
 
@@ -76,7 +76,7 @@ git -C "$SCRIPT_DIR" push origin main
 echo ""
 echo "4. Creating GitHub release $TAG..."
 gh release create "$TAG" "$ZIP_PATH" \
-    --repo peterhartree/takebreak \
+    --repo peterhartree/sobreak \
     --title "$APP_NAME $VERSION" \
     --notes "Release $VERSION"
 
@@ -88,29 +88,32 @@ echo "5. Updating homebrew tap..."
 TAP_DIR=$(mktemp -d)
 gh repo clone "$TAP_REPO" "$TAP_DIR" -- -q 2>/dev/null
 
-CASK_FILE="$TAP_DIR/Casks/takebreak.rb"
+# Remove legacy cask from pre-rename (ignored if already gone)
+rm -f "$TAP_DIR/Casks/takebreak.rb"
+
+CASK_FILE="$TAP_DIR/Casks/sobreak.rb"
 
 cat > "$CASK_FILE" << CASK
-cask "takebreak" do
+cask "sobreak" do
   version "$VERSION"
   sha256 "$SHA256"
 
-  url "https://github.com/peterhartree/takebreak/releases/download/v#{version}/TakeBreak-#{version}.zip"
-  name "TakeBreak"
+  url "https://github.com/peterhartree/sobreak/releases/download/v#{version}/SoBreak-#{version}.zip"
+  name "So Break"
   desc "Menu bar break reminder app for macOS"
-  homepage "https://github.com/peterhartree/takebreak"
+  homepage "https://github.com/peterhartree/sobreak"
 
-  app "TakeBreak.app"
+  app "SoBreak.app"
 
   zap trash: [
-    "~/Library/Preferences/is.pjh.take-break.plist",
+    "~/Library/Preferences/is.pjh.so-break.plist",
   ]
 end
 CASK
 
 cd "$TAP_DIR"
-git add Casks/takebreak.rb
-git commit -m "Update TakeBreak to $VERSION"
+git add -A Casks/
+git commit -m "Update So Break to $VERSION"
 git push origin main
 cd "$SCRIPT_DIR"
 
@@ -118,5 +121,5 @@ rm -rf "$TAP_DIR"
 
 echo ""
 echo "=== Done! ==="
-echo "  GitHub release: https://github.com/peterhartree/takebreak/releases/tag/$TAG"
-echo "  Homebrew:       brew upgrade --cask takebreak"
+echo "  GitHub release: https://github.com/peterhartree/sobreak/releases/tag/$TAG"
+echo "  Homebrew:       brew upgrade --cask sobreak"

@@ -1,10 +1,10 @@
-# TakeBreak style guide
+# So Break style guide
 
-Design system for the TakeBreak macOS menu bar app. Part of the AI Wow family.
+Design system for the So Break macOS menu bar app. Part of the AI Wow family.
 
 ## Personality
 
-Warm, playful, companionable. TakeBreak is a friendly doge tapping your shoulder, not a system alert or a corporate wellness popup. The escalating copy does the personality work; the visual design supports it with warmth and polish.
+Warm, playful, companionable. So Break is a friendly doge tapping your shoulder, not a system alert or a corporate wellness popup. The escalating copy does the personality work; the visual design supports it with warmth and polish.
 
 ## Colour palette
 

@@ -1,4 +1,4 @@
-# TakeBreak
+# So Break
 
 Menu bar break reminder app for macOS.
 
@@ -12,7 +12,7 @@ To rebuild and reinstall on mbp: `./install.sh`
 
 ## Deploy
 
-Deploy builds, tags, pushes to GitHub, creates a release with a zip, and updates the homebrew tap (`peterhartree/homebrew-takebreak`).
+Deploy builds, tags, pushes to GitHub, creates a release with a zip, and updates the homebrew tap (`peterhartree/homebrew-sobreak`).
 
 ```bash
 ./deploy.sh <version>   # e.g. ./deploy.sh 1.2.0
@@ -20,7 +20,7 @@ Deploy builds, tags, pushes to GitHub, creates a release with a zip, and updates
 
 The script:
 1. Builds the release app bundle (`build.sh`)
-2. Zips `TakeBreak.app` and computes SHA256
+2. Zips `SoBreak.app` and computes SHA256
 3. Pushes main to GitHub
 4. Creates a tagged GitHub release with the zip attached
 5. Clones the homebrew tap, updates the cask version + SHA256, pushes

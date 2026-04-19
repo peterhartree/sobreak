@@ -1,9 +1,9 @@
-# TakeBreak
+# So Break
 
 A menu bar break reminder for macOS. Nudges you to take a break after an hour of continuous work, with escalating persistence if you keep snoozing.
 
 <p align="center">
-  <img src="Resources/screenshot.png" alt="TakeBreak break reminder dialog">
+  <img src="Resources/screenshot.jpg" alt="So Break break reminder dialog">
 </p>
 
 ## Features
@@ -18,22 +18,22 @@ A menu bar break reminder for macOS. Nudges you to take a break after an hour of
 ## Install
 
 ```bash
-brew install --cask peterhartree/takebreak/takebreak
+brew install --cask peterhartree/sobreak/sobreak
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/peterhartree/takebreak.git
-cd takebreak
+git clone https://github.com/peterhartree/sobreak.git
+cd sobreak
 ./build.sh
-open build/TakeBreak.app
+open build/SoBreak.app
 ```
 
 ## Update
 
 ```bash
-brew upgrade --cask takebreak
+brew upgrade --cask sobreak
 ```
 
 ## Requirements
@@ -42,7 +42,7 @@ macOS 13.0 or later.
 
 ## How it works
 
-TakeBreak lives in your menu bar. The icon changes to show your current state:
+So Break lives in your menu bar. The icon changes to show your current state:
 
 - **●** — working normally
 - **5m** (orange) — five minutes until break reminder
@@ -56,7 +56,7 @@ The app resets its timer whenever you lock your screen, so taking a break is as 
 The app is not codesigned or notarised. On first launch, right-click the app and choose "Open", or run:
 
 ```bash
-xattr -cr /Applications/TakeBreak.app
+xattr -cr /Applications/SoBreak.app
 ```
 
 ## Licence
