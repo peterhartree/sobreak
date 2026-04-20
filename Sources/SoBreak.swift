@@ -10,7 +10,8 @@ struct Config {
     static let workDuration: TimeInterval = 5           // 5 seconds for testing
     static let amberWarning: TimeInterval = 3            // amber at 3s
     static let snoozeDuration: TimeInterval = 600        // 10 minutes (first snooze)
-    static let shortSnoozeDuration: TimeInterval = 300   // 5 minutes (subsequent snoozes)
+    static let shortSnoozeDuration: TimeInterval = 300   // 5 minutes (second snooze)
+    static let persistentSnoozeDuration: TimeInterval = 120  // 2 minutes (third+ snooze)
     static let gracePeriod: TimeInterval = 120           // 2 minutes
     static let nagAfter: TimeInterval = 300              // 5 minutes
     static let finalExtension: TimeInterval = 300        // 5 more minutes
@@ -18,7 +19,8 @@ struct Config {
     static let workDuration: TimeInterval = 3600         // 60 minutes
     static let amberWarning: TimeInterval = 3300         // 55 minutes
     static let snoozeDuration: TimeInterval = 600        // 10 minutes (first snooze)
-    static let shortSnoozeDuration: TimeInterval = 300   // 5 minutes (subsequent snoozes)
+    static let shortSnoozeDuration: TimeInterval = 300   // 5 minutes (second snooze)
+    static let persistentSnoozeDuration: TimeInterval = 120  // 2 minutes (third+ snooze)
     static let gracePeriod: TimeInterval = 120           // 2 minutes
     static let nagAfter: TimeInterval = 300              // 5 minutes
     static let finalExtension: TimeInterval = 300        // 5 more minutes
@@ -241,6 +243,11 @@ class MediaDetector {
 
 // MARK: - Overlay Window
 
+class KeyableWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
 class OverlayWindowController: NSObject, ObservableObject {
     private enum Metrics {
         static let centerSize = NSSize(width: 400, height: 450)
@@ -344,7 +351,7 @@ class OverlayWindowController: NSObject, ObservableObject {
         )
         hostingView.frame = NSRect(origin: .zero, size: size)
 
-        let win = NSWindow(
+        let win = KeyableWindow(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless],
             backing: .buffered,
@@ -1092,8 +1099,13 @@ class SoBreakController: NSObject {
 
         overlayController.message = message
         overlayController.subtitle = snoozeCount > 0 ? "Snoozed \(snoozeCount) time\(snoozeCount == 1 ? "" : "s") · \(elapsed) min active" : "\(elapsed) min of continuous work"
-        let nextSnoozeMins = snoozeCount == 0 ? Int(Config.snoozeDuration / 60) : Int(Config.shortSnoozeDuration / 60)
-        snoozeReadyLabel = "Snooze \(nextSnoozeMins) min"
+        let nextSnoozeSeconds: TimeInterval
+        switch snoozeCount {
+        case 0: nextSnoozeSeconds = Config.snoozeDuration
+        case 1: nextSnoozeSeconds = Config.shortSnoozeDuration
+        default: nextSnoozeSeconds = Config.persistentSnoozeDuration
+        }
+        snoozeReadyLabel = "Snooze \(Int(nextSnoozeSeconds / 60)) min"
         snoozeUnlockAt = Date().addingTimeInterval(snoozeConfirmationDelay())
         overlayController.snoozeLabel = snoozeReadyLabel
         overlayController.showSnooze = true
@@ -1108,7 +1120,7 @@ class SoBreakController: NSObject {
         overlayController.onTakeBreak = { [weak self] in self?.takeBreak() }
 
         overlayController.isCompact = false
-        showDim(opacity: 0.4)
+        showDim(opacity: 0.4, blocking: true)
         overlayController.show(position: .center)
         updateMenuBarDisplay()
     }
@@ -1124,7 +1136,12 @@ class SoBreakController: NSObject {
 
         snoozeUnlockAt = nil
         snoozeCount += 1
-        let duration = snoozeCount <= 1 ? Config.snoozeDuration : Config.shortSnoozeDuration
+        let duration: TimeInterval
+        switch snoozeCount {
+        case 1: duration = Config.snoozeDuration
+        case 2: duration = Config.shortSnoozeDuration
+        default: duration = Config.persistentSnoozeDuration
+        }
         phase = .working
         snoozeUntil = Date().addingTimeInterval(duration)
         hideDim()
@@ -1202,7 +1219,7 @@ class SoBreakController: NSObject {
         overlayController.onFiveMore = { [weak self] in self?.fiveMoreMinutes() }
 
         overlayController.isCompact = false
-        showDim(opacity: 0.4)
+        showDim(opacity: 0.4, blocking: true)
         overlayController.show(position: .center)
         updateMenuBarDisplay()
     }
@@ -1236,7 +1253,7 @@ class SoBreakController: NSObject {
 
     // MARK: - Screen Dim
 
-    private func showDim(opacity: CGFloat = 0.4) {
+    private func showDim(opacity: CGFloat = 0.4, blocking: Bool = false) {
         hideDim()
         for screen in NSScreen.screens {
             let win = NSWindow(
@@ -1249,7 +1266,7 @@ class SoBreakController: NSObject {
             win.isOpaque = false
             win.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)) - 1)
             win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            win.ignoresMouseEvents = true
+            win.ignoresMouseEvents = !blocking
             win.isReleasedWhenClosed = false
             win.orderFrontRegardless()
             dimWindows.append(win)
