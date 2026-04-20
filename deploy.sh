@@ -88,6 +88,8 @@ echo "5. Updating homebrew tap..."
 TAP_DIR=$(mktemp -d)
 gh repo clone "$TAP_REPO" "$TAP_DIR" -- -q 2>/dev/null
 
+mkdir -p "$TAP_DIR/Casks"
+
 # Remove legacy cask from pre-rename (ignored if already gone)
 rm -f "$TAP_DIR/Casks/takebreak.rb"
 
