@@ -14,7 +14,7 @@ struct Config {
     static let persistentSnoozeDuration: TimeInterval = 120  // 2 minutes (third+ snooze)
     static let gracePeriod: TimeInterval = 120           // 2 minutes
     static let nagAfter: TimeInterval = 300              // 5 minutes
-    static let finalExtension: TimeInterval = 300        // 5 more minutes
+    static let finalExtension: TimeInterval = 60         // 1 more minute
     #else
     static let workDuration: TimeInterval = 3600         // 60 minutes
     static let amberWarning: TimeInterval = 3300         // 55 minutes
@@ -23,7 +23,7 @@ struct Config {
     static let persistentSnoozeDuration: TimeInterval = 120  // 2 minutes (third+ snooze)
     static let gracePeriod: TimeInterval = 120           // 2 minutes
     static let nagAfter: TimeInterval = 300              // 5 minutes
-    static let finalExtension: TimeInterval = 300        // 5 more minutes
+    static let finalExtension: TimeInterval = 60         // 1 more minute
     #endif
 
     static let assertionCheckInterval: TimeInterval = 10
@@ -85,7 +85,7 @@ struct Messages {
     ]
     static let nagSubtle = "your break is waiting for you."
 
-    static let fiveMoreMinutesMessage = "five more minutes..."
+    static let fiveMoreMinutesMessage = "one more minute..."
     static let fiveMoreMinutesSubtitle = "then it's really break time, fren"
 
     static let pomodoroStarted = [
@@ -683,7 +683,7 @@ struct OverlayView: View {
 
             if controller.showFiveMore {
                 Button(action: { controller.onFiveMore?() }) {
-                    Text("5 more minutes")
+                    Text("1 more minute")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(Palette.suiGray)
                 }
@@ -706,7 +706,7 @@ struct OverlayView: View {
 
             if controller.showFiveMore {
                 Button(action: { controller.onFiveMore?() }) {
-                    Text("5 more min")
+                    Text("1 more min")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundColor(Palette.suiGray)
                 }
