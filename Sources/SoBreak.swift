@@ -30,7 +30,7 @@ struct Config {
     static let menuBarUpdateInterval: TimeInterval = 1
     static let firstSnoozeConfirmationDelay: TimeInterval = 5
     static let repeatedSnoozeConfirmationDelay: TimeInterval = 10
-    static let lockResetThreshold: TimeInterval = 60     // reset break counter only if locked ≥ 60s
+    static let lockResetThreshold: TimeInterval = 300    // reset break counter only if locked ≥ 5 min
 }
 
 // MARK: - AI Wow Colour Palette
@@ -959,36 +959,18 @@ class SoBreakController: NSObject {
         NSLog("[SoBreak] Screen locked — pausing timers")
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            let alertWasDue = self.isAlertDue()
             self.lockedAt = Date()
             self.cancelAllTimers()
             self.overlayController.dismiss()
             self.hideDim()
             self.phase = .idle
-            if alertWasDue {
-                // Treat the lock itself as taking the break; no overdue counter to resume.
-                self.workStartTime = nil
-            }
-            // Otherwise preserve workStartTime so a quick unlock (< lockResetThreshold) resumes.
+            // Preserve workStartTime so a quick unlock (< lockResetThreshold) resumes the counter.
             self.snoozeCount = 0
             self.snoozeUntil = nil
             self.graceStartTime = nil
             self.customWorkDuration = nil
             self.updatePomodoroMenuItems()
             self.updateMenuBarDisplay()
-        }
-    }
-
-    /// True if a break alert was showing, in grace/nag, or the work timer had elapsed.
-    private func isAlertDue() -> Bool {
-        switch phase {
-        case .alertShown, .alertPending, .graceCountdown, .nagging:
-            return true
-        case .working:
-            guard let start = workStartTime else { return false }
-            return Date().timeIntervalSince(start) >= effectiveWorkDuration
-        case .idle:
-            return false
         }
     }
 
