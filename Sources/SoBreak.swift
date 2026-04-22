@@ -76,8 +76,11 @@ struct Messages {
         "quite the streak! but seriously, a short break works wonders.",
         "many snooze. such stubborn. your chair is starting to worry.",
         "very committed. wow. five minutes won't undo that.",
-        "doge has asked nicely five times now. please take break.",
     ]
+
+    static func snoozeEscalationFallback(snoozeCount: Int) -> String {
+        "doge has asked nicely \(snoozeCount) times now. please take break."
+    }
 
     static let graceCountdown = "wrapping up..."
     static let nagMessage = [
@@ -274,6 +277,8 @@ class OverlayWindowController: NSObject, ObservableObject {
     @Published var isCompact: Bool = false
     @Published var snoozeLabel: String = "Snooze 10 min"
     @Published var isSnoozeEnabled: Bool = true
+    @Published var fiveMoreLabel: String = "1 more minute"
+    @Published var isFiveMoreEnabled: Bool = true
 
     var onSnooze: (() -> Void)?
     var onTakeBreak: (() -> Void)?
@@ -684,11 +689,13 @@ struct OverlayView: View {
 
             if controller.showFiveMore {
                 Button(action: { controller.onFiveMore?() }) {
-                    Text("1 more minute")
+                    Text(controller.fiveMoreLabel)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(Palette.suiGray)
                 }
                 .buttonStyle(.plain)
+                .disabled(!controller.isFiveMoreEnabled)
+                .opacity(controller.isFiveMoreEnabled ? 1 : 0.4)
             }
         }
     }
@@ -707,11 +714,13 @@ struct OverlayView: View {
 
             if controller.showFiveMore {
                 Button(action: { controller.onFiveMore?() }) {
-                    Text("1 more min")
+                    Text(controller.fiveMoreLabel)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundColor(Palette.suiGray)
                 }
                 .buttonStyle(.plain)
+                .disabled(!controller.isFiveMoreEnabled)
+                .opacity(controller.isFiveMoreEnabled ? 1 : 0.4)
             }
         }
     }
@@ -797,6 +806,11 @@ class SoBreakController: NSObject {
     private var confirmationWindow: NSWindow?
     private var snoozeUnlockAt: Date?
     private var snoozeReadyLabel: String = "Snooze 10 min"
+    private var fiveMoreUnlockAt: Date?
+    private var fiveMoreClickCount: Int = 0
+    private static let fiveMoreReadyLabel = "1 more minute"
+    private static let firstFiveMoreDelay: TimeInterval = 5
+    private static let repeatedFiveMoreDelay: TimeInterval = 10
     private var lockedAt: Date?
 
     func start() {
@@ -1018,6 +1032,25 @@ class SoBreakController: NSObject {
         overlayController.snoozeLabel = isReady ? snoozeReadyLabel : "\(snoozeReadyLabel) (\(remaining)s)"
     }
 
+    private func updateFiveMoreButtonState(now: Date = Date()) {
+        guard phase == .nagging, overlayController.showFiveMore else {
+            overlayController.isFiveMoreEnabled = true
+            overlayController.fiveMoreLabel = Self.fiveMoreReadyLabel
+            return
+        }
+
+        guard let fiveMoreUnlockAt else {
+            overlayController.isFiveMoreEnabled = true
+            overlayController.fiveMoreLabel = Self.fiveMoreReadyLabel
+            return
+        }
+
+        let remaining = max(0, Int(ceil(fiveMoreUnlockAt.timeIntervalSince(now))))
+        let isReady = remaining == 0
+        overlayController.isFiveMoreEnabled = isReady
+        overlayController.fiveMoreLabel = isReady ? Self.fiveMoreReadyLabel : "\(Self.fiveMoreReadyLabel) (\(remaining)s)"
+    }
+
     // MARK: - Core Logic
 
     private func startWorking() {
@@ -1030,7 +1063,11 @@ class SoBreakController: NSObject {
         snoozeUntil = nil
         graceStartTime = nil
         snoozeUnlockAt = nil
+        fiveMoreUnlockAt = nil
+        fiveMoreClickCount = 0
         overlayController.isSnoozeEnabled = true
+        overlayController.isFiveMoreEnabled = true
+        overlayController.fiveMoreLabel = Self.fiveMoreReadyLabel
         overlayController.showSnooze = true
         overlayController.snoozeLabel = snoozeReadyLabel
         NSLog("[SoBreak] Started working, timer from \(workStartTime!)")
@@ -1042,6 +1079,10 @@ class SoBreakController: NSObject {
 
         if phase == .alertShown {
             updateSnoozeButtonState()
+        }
+
+        if phase == .nagging {
+            updateFiveMoreButtonState()
         }
 
         if phase == .graceCountdown {
@@ -1088,9 +1129,10 @@ class SoBreakController: NSObject {
         let message: String
         if snoozeCount == 0 {
             message = Messages.firstAlert.randomElement()!
+        } else if snoozeCount <= Messages.snoozeEscalation.count {
+            message = Messages.snoozeEscalation[snoozeCount - 1]
         } else {
-            let index = min(snoozeCount - 1, Messages.snoozeEscalation.count - 1)
-            message = Messages.snoozeEscalation[index]
+            message = Messages.snoozeEscalationFallback(snoozeCount: snoozeCount)
         }
 
         let elapsed = workStartTime.map { Int(Date().timeIntervalSince($0)) / 60 } ?? 0
@@ -1229,6 +1271,11 @@ class SoBreakController: NSObject {
         overlayController.showFiveMore = true
         overlayController.showCountdown = false
 
+        let fiveMoreDelay = fiveMoreClickCount == 0 ? Self.firstFiveMoreDelay : Self.repeatedFiveMoreDelay
+        fiveMoreUnlockAt = Date().addingTimeInterval(fiveMoreDelay)
+        overlayController.fiveMoreLabel = Self.fiveMoreReadyLabel
+        updateFiveMoreButtonState()
+
         overlayController.onLockNow = { [weak self] in self?.lockScreen() }
         overlayController.onFiveMore = { [weak self] in self?.fiveMoreMinutes() }
 
@@ -1239,6 +1286,14 @@ class SoBreakController: NSObject {
     }
 
     private func fiveMoreMinutes() {
+        updateFiveMoreButtonState()
+        guard overlayController.isFiveMoreEnabled else {
+            NSLog("[SoBreak] '1 more minute' click ignored — cooldown still active")
+            return
+        }
+
+        fiveMoreUnlockAt = nil
+        fiveMoreClickCount += 1
         phase = .graceCountdown
         graceStartTime = Date()
         graceDuration = Config.finalExtension
@@ -1503,6 +1558,8 @@ class SoBreakController: NSObject {
         snoozeUntil = nil
         graceStartTime = nil
         snoozeUnlockAt = nil
+        fiveMoreUnlockAt = nil
+        fiveMoreClickCount = 0
         NSLog("[SoBreak] Started \(minutes) min pomodoro timer")
         updatePomodoroMenuItems()
         updateMenuBarDisplay()
@@ -1519,6 +1576,8 @@ class SoBreakController: NSObject {
         snoozeUntil = nil
         graceStartTime = nil
         snoozeUnlockAt = nil
+        fiveMoreUnlockAt = nil
+        fiveMoreClickCount = 0
         NSLog("[SoBreak] Cancelled pomodoro, back to default 60 min timer")
         updatePomodoroMenuItems()
         updateMenuBarDisplay()
