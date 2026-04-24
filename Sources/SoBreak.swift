@@ -70,6 +70,22 @@ struct Messages {
         "you've been going strong. much work. break time?",
     ]
 
+    /// Hour-specific variants — only valid when elapsed ≈ 60 min.
+    static let firstAlertHour = [
+        "much focus! you've been at it for an hour. break time?",
+        "wow, an hour already! your eyes and brain would love a break.",
+        "one hour of solid work. very impressive. time to step away?",
+        "such dedication! sixty minutes of focus. how about a break?",
+        "you've been going strong for an hour. much work. break time?",
+    ]
+
+    static func firstAlertPool(elapsedMinutes: Int) -> [String] {
+        if abs(elapsedMinutes - 60) <= 5 {
+            return firstAlert + firstAlertHour
+        }
+        return firstAlert
+    }
+
     static let snoozeEscalation = [
         "still going? very determined. break whenever you're ready, fren.",
         "such snooze. your future self would appreciate a stretch.",
@@ -1126,16 +1142,16 @@ class SoBreakController: NSObject {
         NSLog("[SoBreak] Showing break alert (snoozeCount: \(snoozeCount))")
         phase = .alertShown
 
+        let elapsed = workStartTime.map { Int(Date().timeIntervalSince($0)) / 60 } ?? 0
+
         let message: String
         if snoozeCount == 0 {
-            message = Messages.firstAlert.randomElement()!
+            message = Messages.firstAlertPool(elapsedMinutes: elapsed).randomElement()!
         } else if snoozeCount <= Messages.snoozeEscalation.count {
             message = Messages.snoozeEscalation[snoozeCount - 1]
         } else {
             message = Messages.snoozeEscalationFallback(snoozeCount: snoozeCount)
         }
-
-        let elapsed = workStartTime.map { Int(Date().timeIntervalSince($0)) / 60 } ?? 0
 
         let dogeEnum = DogeImage.forAlert(snoozeCount: snoozeCount)
         overlayController.dogeImageEnum = dogeEnum
