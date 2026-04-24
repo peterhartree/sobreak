@@ -63,11 +63,11 @@ struct Palette {
 
 struct Messages {
     static let firstAlert = [
-        "much focus! you've been at it for an hour. break time?",
-        "wow, an hour already! your eyes and brain would love a break.",
-        "one hour of solid work. very impressive. time to step away?",
-        "such dedication! sixty minutes of focus. how about a break?",
-        "you've been going strong for an hour. much work. break time?",
+        "much focus! break time?",
+        "wow, solid stretch. your eyes and brain would love a break.",
+        "very impressive streak. time to step away?",
+        "such dedication! how about a break?",
+        "you've been going strong. much work. break time?",
     ]
 
     static let snoozeEscalation = [
