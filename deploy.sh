@@ -119,7 +119,7 @@ git commit -m "Update So Break to $VERSION"
 git push origin main
 cd "$SCRIPT_DIR"
 
-rm -rf "$TAP_DIR"
+trash "$TAP_DIR"
 
 echo ""
 echo "=== Done! ==="

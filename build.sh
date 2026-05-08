@@ -22,7 +22,9 @@ if [ -n "$DEBUG_FLAG" ]; then
 fi
 
 # Clean and create bundle structure
-rm -rf "$APP_BUNDLE"
+if [ -d "$APP_BUNDLE" ]; then
+    trash "$APP_BUNDLE"
+fi
 mkdir -p "$MACOS"
 
 # Compile

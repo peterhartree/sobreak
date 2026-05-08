@@ -28,7 +28,7 @@ mkdir -p "$INSTALL_DIR"
 if [ -d "$INSTALL_DIR/$APP_NAME.app" ]; then
     # Stop running instance first
     launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-    rm -rf "$INSTALL_DIR/$APP_NAME.app"
+    trash "$INSTALL_DIR/$APP_NAME.app"
 fi
 cp -R "$APP_BUNDLE" "$INSTALL_DIR/"
 
@@ -70,5 +70,5 @@ echo "  Logs: /tmp/break-reminder.log"
 echo ""
 echo "To uninstall:"
 echo "  launchctl bootout gui/$(id -u) $LAUNCH_AGENT_DIR/$PLIST_NAME"
-echo "  rm -rf $INSTALL_DIR/$APP_NAME.app"
+echo "  trash $INSTALL_DIR/$APP_NAME.app"
 echo "  rm $LAUNCH_AGENT_DIR/$PLIST_NAME"
